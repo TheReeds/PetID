@@ -1,5 +1,6 @@
 import 'package:apppetid/presentation/providers/auth_provider.dart';
 import 'package:apppetid/presentation/screens/auth/auth_screen.dart';
+import 'package:apppetid/presentation/screens/home/home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -34,7 +35,7 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.indigo,
         useMaterial3: true,
       ),
-      home: const AuthScreen(),
+      home: HomeScreen(),
     );
   }
 }
