@@ -45,5 +45,23 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>FirebaseAppDelegateProxyEnabled</key>
+    <false/>
+    <key>NSCameraUsageDescription</key>
+    <string>La app necesita acceso a la cámara.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>La app necesita acceso a tus fotos.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>La app necesita tu ubicación para funcionar correctamente.</string>
+    <key>UIBackgroundModes</key>
+    <array>
+      <string>fetch</string>
+      <string>remote-notification</string>
+    </array>
+    <key>NSCameraUsageDescription</key>
+    <string>Necesitamos acceso a tu cámara para tomar fotos.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Necesitamos acceder a tus fotos para que puedas subir imágenes.</string>
+
 </dict>
 </plist>
