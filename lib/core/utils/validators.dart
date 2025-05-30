@@ -5,9 +5,9 @@ class Validators {
       return 'El email es requerido';
     }
 
-    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4});
-        if (!emailRegex.hasMatch(value)) {
-    return 'Ingresa un email válido';
+    final emailRegex = RegExp(r'^[\w\.-]+@([\w-]+\.)+[\w-]{2,4}$');
+    if (!emailRegex.hasMatch(value)) {
+      return 'Ingresa un email válido';
     }
 
     return null;
@@ -45,9 +45,9 @@ class Validators {
       return 'El teléfono es requerido';
     }
 
-    final phoneRegex = RegExp(r'^\+?[\d\s\-\(\)]{8,});
-        if (!phoneRegex.hasMatch(value)) {
-    return 'Ingresa un teléfono válido';
+    final phoneRegex = RegExp(r'^\+?[\d\s\-\(\)]{8,}$');
+    if (!phoneRegex.hasMatch(value)) {
+      return 'Ingresa un teléfono válido';
     }
 
     return null;
