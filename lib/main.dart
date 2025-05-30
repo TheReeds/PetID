@@ -1,6 +1,7 @@
 import 'package:apppetid/presentation/providers/auth_provider.dart';
 import 'package:apppetid/presentation/screens/auth/auth_screen.dart';
 import 'package:apppetid/presentation/screens/auth/register_screen.dart';
+import 'package:apppetid/presentation/screens/auth/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
