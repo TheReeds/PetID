@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "933930385034",
+    "project_id": "apppetid-1ff32",
+    "storage_bucket": "apppetid-1ff32.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:933930385034:android:1b1b9d98774a8c0aed7773",
+        "android_client_info": {
+          "package_name": "com.petid.apppetid"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAMYcvhe3GP53W3EgcUEaEm22thc0rXhvc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
