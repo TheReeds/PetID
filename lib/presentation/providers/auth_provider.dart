@@ -249,8 +249,21 @@ class AuthProvider extends ChangeNotifier {
   // Recargar datos del usuario
   Future<void> refreshUserData() async {
     if (_firebaseUser != null) {
-      await _loadUserData(_firebaseUser!.uid);
-      notifyListeners();
+      try {
+        // Recargar usuario de Firebase Auth
+        await _firebaseUser!.reload();
+        _firebaseUser = FirebaseAuth.instance.currentUser;
+
+        // Recargar datos de Firestore
+        await _loadUserData(_firebaseUser!.uid);
+
+        // Asegurar que el estado sea authenticated
+        if (_currentUser != null) {
+          _setState(AuthState.authenticated);
+        }
+      } catch (e) {
+        print('Error refreshing user data: $e');
+      }
     }
   }
 

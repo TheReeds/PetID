@@ -237,6 +237,22 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
 
     if (success) {
       _showSnackBar('¡Registro exitoso! Bienvenido a PetID');
+
+      // Esperar un momento para que se vea el mensaje
+      await Future.delayed(const Duration(milliseconds: 1500));
+
+      // El Consumer en main.dart manejará automáticamente la navegación
+      // pero asegurémonos de que el contexto siga siendo válido
+      if (mounted) {
+        // Forzar actualización del estado
+        authProvider.refreshUserData();
+      }
+    } else {
+      // El error se maneja automáticamente en el AuthProvider
+      // pero puedes agregar lógica adicional aquí si es necesario
+      if (authProvider.errorMessage != null) {
+        _showSnackBar(authProvider.errorMessage!, isError: true);
+      }
     }
   }
 

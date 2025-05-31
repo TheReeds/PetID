@@ -1,7 +1,11 @@
 import 'package:apppetid/presentation/providers/auth_provider.dart';
+import 'package:apppetid/presentation/providers/pet_provider.dart';
 import 'package:apppetid/presentation/screens/auth/register_screen.dart';
 import 'package:apppetid/presentation/screens/auth/login_screen.dart';
+import 'package:apppetid/presentation/screens/home/add_first_pet_screen.dart';
 import 'package:apppetid/presentation/screens/home/home_screen.dart';
+import 'package:apppetid/presentation/screens/pets/add_pet_screen.dart';
+import 'package:apppetid/presentation/screens/pets/my_pets.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
@@ -18,6 +22,7 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => PetProvider()),
       ],
       child: const MyApp(),
     ),
@@ -41,8 +46,8 @@ class MyApp extends StatelessWidget {
         ),
       ),
       // Usar Consumer para manejar el estado de autenticación
-      home: Consumer<AuthProvider>(
-        builder: (context, authProvider, child) {
+      home: Consumer2<AuthProvider, PetProvider>(
+        builder: (context, authProvider, petProvider, child) {
           // Si está cargando inicialmente, mostrar pantalla de carga
           if (authProvider.state == AuthState.initial ||
               (authProvider.isLoading && authProvider.currentUser == null)) {
@@ -70,9 +75,44 @@ class MyApp extends StatelessWidget {
             );
           }
 
-          // Si el usuario está autenticado, ir al HomeScreen
+          // Si el usuario está autenticado
           if (authProvider.isAuthenticated && authProvider.currentUser != null) {
-            return const HomeScreen(); // Cambiado de AuthScreen a HomeScreen
+            // Cargar mascotas del usuario si no se han cargado
+            if (petProvider.state == PetState.idle) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                petProvider.loadUserPets(authProvider.currentUser!.id);
+              });
+
+              // Mostrar loading mientras cargan las mascotas
+              return const Scaffold(
+                backgroundColor: Color(0xFFF8F9FA),
+                body: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(
+                        color: Color(0xFF4A7AA7),
+                      ),
+                      SizedBox(height: 20),
+                      Text(
+                        'Cargando tus mascotas...',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Color(0xFF4A7AA7),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            // Si ya cargaron las mascotas, decidir qué mostrar
+            if (petProvider.userPets.isEmpty) {
+              return const AddFirstPetScreen(); // Pantalla para agregar primera mascota
+            } else {
+              return const MyPetsScreen(); // Pantalla principal con mascotas
+            }
           }
 
           // Si no está autenticado, mostrar LoginScreen
@@ -84,6 +124,9 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),
         '/home': (context) => const HomeScreen(),
+        '/add-first-pet': (context) => const AddFirstPetScreen(),
+        '/add-pet': (context) => const AddPetScreen(),
+        '/my-pets': (context) => const MyPetsScreen(),
         // Agrega más rutas según necesites
       },
     );
