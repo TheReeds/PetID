@@ -1,6 +1,6 @@
 import 'package:apppetid/presentation/providers/auth_provider.dart';
 import 'package:apppetid/presentation/screens/auth/register_screen.dart';
-import 'package:apppetid/presentation/screens/auth/login_screen.dart'; // Importa tu HomeScreen
+import 'package:apppetid/presentation/screens/auth/login_screen.dart';
 import 'package:apppetid/presentation/screens/home/home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
