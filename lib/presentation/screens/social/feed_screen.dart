@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../../providers/post_provider.dart';
+import '../../providers/pet_provider.dart';
 
 import '../../../data/models/post_model.dart';
 import '../../providers/auth_provider.dart';
@@ -69,6 +71,12 @@ class _FeedScreenState extends State<FeedScreen> with TickerProviderStateMixin {
       CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
     );
     _animationController.forward();
+
+    // Cargar datos iniciales
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final postProvider = Provider.of<PostProvider>(context, listen: false);
+      postProvider.loadFeedPosts(refresh: true);
+    });
   }
 
   @override
@@ -84,25 +92,67 @@ class _FeedScreenState extends State<FeedScreen> with TickerProviderStateMixin {
       backgroundColor: const Color(0xFFF8F9FA),
       body: FadeTransition(
         opacity: _fadeAnimation,
-        child: CustomScrollView(
-          controller: _scrollController,
-          slivers: [
-            _buildAppBar(),
-            _buildStoriesSection(),
-            _buildQuickActions(),
-            SliverList(
-              delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                  if (index < _posts.length) {
-                    return _buildPostCard(_posts[index]);
-                  }
-                  return _buildLoadMoreCard();
-                },
-                childCount: _posts.length + 1,
-              ),
-            ),
-          ],
+        child: Consumer<PostProvider>(
+          builder: (context, postProvider, child) {
+            return CustomScrollView(
+              controller: _scrollController,
+              slivers: [
+                _buildAppBar(),
+                _buildStoriesSection(),
+                _buildQuickActions(),
+                if (postProvider.isLoading && postProvider.feedPosts.isEmpty)
+                  const SliverFillRemaining(
+                    child: Center(
+                      child: CircularProgressIndicator(color: Color(0xFF4A7AA7)),
+                    ),
+                  )
+                else if (postProvider.feedPosts.isEmpty)
+                  SliverFillRemaining(
+                    child: _buildEmptyState(),
+                  )
+                else
+                  SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                        if (index < postProvider.feedPosts.length) {
+                          return _buildPostCard(postProvider.feedPosts[index]);
+                        }
+                        return _buildLoadMoreCard();
+                      },
+                      childCount: postProvider.feedPosts.length + 1,
+                    ),
+                  ),
+              ],
+            );
+          },
         ),
+      ),
+    );
+  }
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.pets, size: 80, color: Colors.grey.shade300),
+          const SizedBox(height: 16),
+          Text(
+            '¡Bienvenido a PetID!',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Sé el primero en compartir algo con la comunidad',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey.shade500,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -585,9 +635,12 @@ class _FeedScreenState extends State<FeedScreen> with TickerProviderStateMixin {
 
   void _toggleLike(PostModel post) {
     HapticFeedback.lightImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Like próximamente')),
-    );
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final postProvider = Provider.of<PostProvider>(context, listen: false);
+
+    if (authProvider.currentUser != null) {
+      postProvider.toggleLike(post.id, authProvider.currentUser!.id);
+    }
   }
 
   void _showComments(PostModel post) {

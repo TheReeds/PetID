@@ -8,6 +8,7 @@ import '../../../data/models/pet_model.dart';
 import '../../../data/models/post_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/pet_provider.dart';
+import '../../providers/post_provider.dart';
 
 class PostCreateScreen extends StatefulWidget {
   const PostCreateScreen({super.key});
@@ -487,6 +488,7 @@ class _PostCreateScreenState extends State<PostCreateScreen> {
                       const DropdownMenuItem<PetModel>(
                         value: null,
                         child: Row(
+                          mainAxisSize: MainAxisSize.min, // AGREGADO
                           children: [
                             Icon(Icons.not_interested, color: Colors.grey),
                             SizedBox(width: 12),
@@ -497,6 +499,7 @@ class _PostCreateScreenState extends State<PostCreateScreen> {
                       ...pets.map((pet) => DropdownMenuItem<PetModel>(
                         value: pet,
                         child: Row(
+                          mainAxisSize: MainAxisSize.min, // AGREGADO
                           children: [
                             CircleAvatar(
                               radius: 16,
@@ -509,9 +512,11 @@ class _PostCreateScreenState extends State<PostCreateScreen> {
                                   : null,
                             ),
                             const SizedBox(width: 12),
-                            Expanded(
+                            // CAMBIO: Usar Flexible en lugar de Expanded
+                            Flexible(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min, // AGREGADO
                                 children: [
                                   Text(
                                     pet.name,
@@ -519,6 +524,7 @@ class _PostCreateScreenState extends State<PostCreateScreen> {
                                       fontSize: 14,
                                       fontWeight: FontWeight.w500,
                                     ),
+                                    overflow: TextOverflow.ellipsis, // AGREGADO
                                   ),
                                   Text(
                                     '${pet.breed} • ${pet.displayAge}',
@@ -526,6 +532,7 @@ class _PostCreateScreenState extends State<PostCreateScreen> {
                                       fontSize: 12,
                                       color: Colors.grey.shade600,
                                     ),
+                                    overflow: TextOverflow.ellipsis, // AGREGADO
                                   ),
                                 ],
                               ),
@@ -1144,7 +1151,7 @@ class _PostCreateScreenState extends State<PostCreateScreen> {
   }
 
   Future<void> _publishPost() async {
-    // Validaciones
+    // Validaciones existentes...
     if (_contentController.text.trim().isEmpty) {
       _showSnackBar('Por favor escribe algo antes de publicar', isError: true);
       return;
@@ -1160,7 +1167,6 @@ class _PostCreateScreenState extends State<PostCreateScreen> {
       return;
     }
 
-    // Confirmar publicación para anuncios
     if (_selectedType == PostType.announcement) {
       final confirm = await _showConfirmDialog();
       if (!confirm) return;
@@ -1173,21 +1179,40 @@ class _PostCreateScreenState extends State<PostCreateScreen> {
     try {
       HapticFeedback.mediumImpact();
 
-      // Aquí implementarías la lógica para:
-      // 1. Subir las imágenes a Storage
-      // 2. Crear el documento del post en Firestore
-      // 3. Notificar a seguidores si es necesario
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final postProvider = Provider.of<PostProvider>(context, listen: false);
 
-      // Simulación del proceso de publicación
-      await Future.delayed(const Duration(seconds: 2));
+      if (authProvider.currentUser == null) {
+        throw Exception('Usuario no autenticado');
+      }
 
-      // Mostrar mensaje de éxito
-      _showSnackBar('¡Publicación creada exitosamente! 🎉');
+      // Crear el post
+      final newPost = PostModel(
+        id: '', // Se generará en el repository
+        authorId: authProvider.currentUser!.id,
+        petId: _selectedPet?.id,
+        type: _selectedType,
+        content: _contentController.text.trim(),
+        hashtags: _hashtags,
+        isPublic: _isPublic,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
 
-      // Volver a la pantalla anterior
-      await Future.delayed(const Duration(milliseconds: 500));
-      if (mounted) {
-        Navigator.of(context).pop();
+      // Crear la publicación
+      final success = await postProvider.createPost(
+        post: newPost,
+        imageFiles: _selectedImages.isNotEmpty ? _selectedImages : null,
+      );
+
+      if (success) {
+        _showSnackBar('¡Publicación creada exitosamente! 🎉');
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+      } else {
+        throw Exception('Error al crear la publicación');
       }
 
     } catch (e) {

@@ -197,3 +197,44 @@ class MatchProvider extends ChangeNotifier {
 
   // Reportar problema con match
   Future<bool> reportMatch({
+    required String matchId,
+    required String reason,
+    required String reporterId,
+  }) async {
+    try {
+      await _matchRepository.reportMatch(
+        matchId: matchId,
+        reason: reason,
+        reporterId: reporterId,
+      );
+      return true;
+    } catch (e) {
+      _setError('Error reportando match: $e');
+      return false;
+    }
+  }
+
+  // Recargar matches del usuario actual
+  Future<void> _reloadCurrentUserMatches() async {
+    // Esta función debería ser llamada desde el AuthProvider o donde tengas el userId actual
+    // Por ahora queda como placeholder
+  }
+
+  // Métodos privados de estado
+  void _setState(MatchState newState) {
+    _state = newState;
+    notifyListeners();
+  }
+
+  void _setError(String error) {
+    _errorMessage = error;
+    _state = MatchState.error;
+    notifyListeners();
+  }
+
+  void _clearError() {
+    _errorMessage = null;
+  }
+
+  void clearError() => _clearError();
+}
