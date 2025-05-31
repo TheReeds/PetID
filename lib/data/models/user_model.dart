@@ -4,9 +4,12 @@ class UserModel {
   final String id;
   final String email;
   final String displayName;
+  final String? fullName;
   final String? photoURL;
   final String? phone;
   final String? address;
+  final DateTime? dateOfBirth;
+  final String? gender;
   final GeoPoint? location;
   final List<String> pets;
   final List<String> followers;
@@ -19,9 +22,12 @@ class UserModel {
     required this.id,
     required this.email,
     required this.displayName,
+    this.fullName,
     this.photoURL,
     this.phone,
     this.address,
+    this.dateOfBirth,
+    this.gender,
     this.location,
     this.pets = const [],
     this.followers = const [],
@@ -39,9 +45,12 @@ class UserModel {
       id: doc.id,
       email: data['email'] ?? '',
       displayName: data['displayName'] ?? '',
+      fullName: data['fullName'],
       photoURL: data['photoURL'],
       phone: data['phone'],
       address: data['address'],
+      dateOfBirth: data['dateOfBirth'] != null ? (data['dateOfBirth'] as Timestamp).toDate() : null,
+      gender: data['gender'],
       location: data['location'],
       pets: List<String>.from(data['pets'] ?? []),
       followers: List<String>.from(data['followers'] ?? []),
@@ -57,9 +66,12 @@ class UserModel {
     return {
       'email': email,
       'displayName': displayName,
+      'fullName': fullName,
       'photoURL': photoURL,
       'phone': phone,
       'address': address,
+      'dateOfBirth': dateOfBirth != null ? Timestamp.fromDate(dateOfBirth!) : null,
+      'gender': gender,
       'location': location,
       'pets': pets,
       'followers': followers,
@@ -73,9 +85,12 @@ class UserModel {
   // Copiar con modificaciones
   UserModel copyWith({
     String? displayName,
+    String? fullName,
     String? photoURL,
     String? phone,
     String? address,
+    DateTime? dateOfBirth,
+    String? gender,
     GeoPoint? location,
     List<String>? pets,
     List<String>? followers,
@@ -86,9 +101,12 @@ class UserModel {
       id: id,
       email: email,
       displayName: displayName ?? this.displayName,
+      fullName: fullName ?? this.fullName,
       photoURL: photoURL ?? this.photoURL,
       phone: phone ?? this.phone,
       address: address ?? this.address,
+      dateOfBirth: dateOfBirth ?? this.dateOfBirth,
+      gender: gender ?? this.gender,
       location: location ?? this.location,
       pets: pets ?? this.pets,
       followers: followers ?? this.followers,

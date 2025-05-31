@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../data/models/user_model.dart';
@@ -40,11 +41,17 @@ class AuthProvider extends ChangeNotifier {
     });
   }
 
-  // Registro de usuario
+  // Registro de usuario con datos completos
   Future<bool> signUp({
     required String email,
     required String password,
     required String displayName,
+    String? fullName,
+    String? phone,
+    String? address,
+    DateTime? dateOfBirth,
+    String? gender,
+    File? profileImage,
   }) async {
     try {
       _setState(AuthState.loading);
@@ -54,6 +61,12 @@ class AuthProvider extends ChangeNotifier {
         email: email,
         password: password,
         displayName: displayName,
+        fullName: fullName,
+        phone: phone,
+        address: address,
+        dateOfBirth: dateOfBirth,
+        gender: gender,
+        profileImage: profileImage,
       );
 
       if (credential?.user != null) {
@@ -127,6 +140,23 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  // Actualizar foto de perfil
+  Future<bool> updateProfilePhoto(File imageFile) async {
+    try {
+      _setState(AuthState.loading);
+      await _authRepository.updateProfilePhoto(imageFile: imageFile);
+
+      // Recargar datos del usuario para obtener la nueva URL
+      await _loadUserData(_firebaseUser!.uid);
+      _setState(AuthState.authenticated);
+      return true;
+    } catch (e) {
+      _setError(e.toString());
+      _setState(AuthState.error);
+      return false;
+    }
+  }
+
   // Restablecer contraseña
   Future<bool> resetPassword(String email) async {
     try {
@@ -136,6 +166,71 @@ class AuthProvider extends ChangeNotifier {
     } catch (e) {
       _setError(e.toString());
       return false;
+    }
+  }
+
+  // Enviar verificación de email
+  Future<bool> sendEmailVerification() async {
+    try {
+      _clearError();
+      await _authRepository.sendEmailVerification();
+      return true;
+    } catch (e) {
+      _setError(e.toString());
+      return false;
+    }
+  }
+
+  // Actualizar email
+  Future<bool> updateEmail(String newEmail) async {
+    try {
+      _setState(AuthState.loading);
+      await _authRepository.updateEmail(newEmail);
+
+      // Recargar datos del usuario
+      await _loadUserData(_firebaseUser!.uid);
+      _setState(AuthState.authenticated);
+      return true;
+    } catch (e) {
+      _setError(e.toString());
+      _setState(AuthState.error);
+      return false;
+    }
+  }
+
+  // Actualizar contraseña
+  Future<bool> updatePassword(String newPassword) async {
+    try {
+      _clearError();
+      await _authRepository.updatePassword(newPassword);
+      return true;
+    } catch (e) {
+      _setError(e.toString());
+      return false;
+    }
+  }
+
+  // Eliminar cuenta
+  Future<bool> deleteAccount() async {
+    try {
+      _setState(AuthState.loading);
+      await _authRepository.deleteAccount();
+      _currentUser = null;
+      _firebaseUser = null;
+      _setState(AuthState.unauthenticated);
+      return true;
+    } catch (e) {
+      _setError(e.toString());
+      _setState(AuthState.error);
+      return false;
+    }
+  }
+
+  // Recargar datos del usuario
+  Future<void> refreshUserData() async {
+    if (_firebaseUser != null) {
+      await _loadUserData(_firebaseUser!.uid);
+      notifyListeners();
     }
   }
 
@@ -166,4 +261,54 @@ class AuthProvider extends ChangeNotifier {
   }
 
   void clearError() => _clearError();
+
+  // Validaciones útiles
+  bool isValidEmail(String email) {
+    return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
+  }
+
+  bool isValidPassword(String password) {
+    return password.length >= 6;
+  }
+
+  String? validateDisplayName(String displayName) {
+    if (displayName.trim().isEmpty) {
+      return 'El nombre de usuario es obligatorio';
+    }
+    if (displayName.trim().length < 3) {
+      return 'El nombre debe tener al menos 3 caracteres';
+    }
+    if (displayName.trim().length > 20) {
+      return 'El nombre no puede tener más de 20 caracteres';
+    }
+    return null;
+  }
+
+  String? validateEmail(String email) {
+    if (email.trim().isEmpty) {
+      return 'El email es obligatorio';
+    }
+    if (!isValidEmail(email)) {
+      return 'Email inválido';
+    }
+    return null;
+  }
+
+  String? validatePassword(String password) {
+    if (password.isEmpty) {
+      return 'La contraseña es obligatoria';
+    }
+    if (!isValidPassword(password)) {
+      return 'La contraseña debe tener al menos 6 caracteres';
+    }
+    return null;
+  }
+
+  String? validatePhoneNumber(String phone) {
+    if (phone.trim().isEmpty) return null; // Campo opcional
+    if (phone.trim().length < 9) {
+      return 'Número de teléfono inválido';
+    }
+    return null;
+  }
 }
