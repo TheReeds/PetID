@@ -6,6 +6,10 @@ import 'package:apppetid/presentation/screens/home/add_first_pet_screen.dart';
 import 'package:apppetid/presentation/screens/home/home_screen.dart';
 import 'package:apppetid/presentation/screens/pets/add_pet_screen.dart';
 import 'package:apppetid/presentation/screens/pets/my_pets.dart';
+import 'package:apppetid/presentation/screens/social/discover_screen.dart';
+import 'package:apppetid/presentation/screens/social/feed_screen.dart';
+import 'package:apppetid/presentation/screens/social/post_create_screen.dart';
+import 'package:apppetid/presentation/screens/social/profile_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
@@ -111,7 +115,7 @@ class MyApp extends StatelessWidget {
             if (petProvider.userPets.isEmpty) {
               return const AddFirstPetScreen(); // Pantalla para agregar primera mascota
             } else {
-              return const MyPetsScreen(); // Pantalla principal con mascotas
+              return const HomeScreen(); // Pantalla principal con mascotas
             }
           }
 
@@ -127,7 +131,10 @@ class MyApp extends StatelessWidget {
         '/add-first-pet': (context) => const AddFirstPetScreen(),
         '/add-pet': (context) => const AddPetScreen(),
         '/my-pets': (context) => const MyPetsScreen(),
-        // Agrega más rutas según necesites
+        '/feed': (context) => const FeedScreen(),
+        '/discover': (context) => const DiscoverScreen(),
+        '/create-post': (context) => const PostCreateScreen(),
+        '/profile': (context) => const ProfileScreen(),
       },
     );
   }

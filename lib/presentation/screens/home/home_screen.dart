@@ -1,136 +1,188 @@
+// lib/presentation/screens/home_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:apppetid/presentation/providers/auth_provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/pet_provider.dart';
+import '../pets/my_pets.dart';
+import '../social/discover_screen.dart';
+import '../social/feed_screen.dart';
+import '../social/post_create_screen.dart';
+import '../social/profile_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
+  State<HomeScreen> createState() => _HomeScreenState();
+}
 
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
+  int _currentIndex = 0;
+  late PageController _pageController;
+  late AnimationController _fabAnimationController;
+  late Animation<double> _fabAnimation;
+
+  final List<Widget> _screens = [
+    const FeedScreen(),
+    const DiscoverScreen(),
+    const SizedBox.shrink(), // Placeholder para el FAB
+    const MyPetsScreen(),
+    const ProfileScreen(),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+    _fabAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+    _fabAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fabAnimationController, curve: Curves.easeOut),
+    );
+    _fabAnimationController.forward();
+
+    // Cargar datos iniciales
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final petProvider = Provider.of<PetProvider>(context, listen: false);
+
+      if (authProvider.currentUser != null) {
+        petProvider.loadUserPets(authProvider.currentUser!.id);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _fabAnimationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
-      appBar: AppBar(
-        title: const Text(
-          'PetID',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF4A7AA7),
-          ),
-        ),
-        backgroundColor: Colors.white,
-        elevation: 1,
-        actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(
-              Icons.more_vert,
-              color: Color(0xFF4A7AA7),
-            ),
-            onSelected: (value) async {
-              if (value == 'logout') {
-                await authProvider.signOut();
-                // El Consumer en main.dart manejará automáticamente la navegación
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'logout',
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.logout_rounded,
-                      color: Colors.red[600],
-                      size: 20,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Cerrar sesión',
-                      style: TextStyle(
-                        color: Colors.red[600],
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+      body: PageView(
+        controller: _pageController,
+        onPageChanged: (index) {
+          if (index != 2) {
+            setState(() {
+              _currentIndex = index;
+            });
+          }
+        },
+        children: _screens,
+      ),
+      bottomNavigationBar: _buildBottomNavigationBar(),
+      floatingActionButton: _buildFloatingActionButton(),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+    );
+  }
+
+  Widget _buildBottomNavigationBar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, -5),
           ),
         ],
       ),
-      body: Center(
+      child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF4A7AA7),
-                  borderRadius: BorderRadius.circular(25),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF4A7AA7).withOpacity(0.3),
-                      blurRadius: 15,
-                      offset: const Offset(0, 8),
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.pets,
-                  size: 50,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 32),
-              Text(
-                '¡Hola, ${authProvider.currentUser?.displayName ?? 'Usuario'}!',
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF4A7AA7),
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Bienvenido a PetID',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFF666666),
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 48),
-              // Aquí puedes agregar más contenido de tu HomeScreen
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 15,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: const Text(
-                  'Tu contenido principal va aquí...',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Color(0xFF333333),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
+              _buildNavItem(0, Icons.home, 'Inicio'),
+              _buildNavItem(1, Icons.explore, 'Explorar'),
+              const SizedBox(width: 60), // Espacio para el FAB
+              _buildNavItem(3, Icons.pets, 'Mascotas'),
+              _buildNavItem(4, Icons.person, 'Perfil'),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(int index, IconData icon, String label) {
+    final isSelected = _currentIndex == index;
+
+    return GestureDetector(
+      onTap: () => _onTabTapped(index),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: isSelected
+                  ? const Color(0xFF4A7AA7)
+                  : Colors.grey.shade400,
+              size: 24,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected
+                    ? const Color(0xFF4A7AA7)
+                    : Colors.grey.shade400,
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFloatingActionButton() {
+    return ScaleTransition(
+      scale: _fabAnimation,
+      child: FloatingActionButton(
+        onPressed: _createPost,
+        backgroundColor: const Color(0xFF4A7AA7),
+        elevation: 8,
+        child: const Icon(
+          Icons.add,
+          color: Colors.white,
+          size: 28,
+        ),
+      ),
+    );
+  }
+
+  void _onTabTapped(int index) {
+    HapticFeedback.lightImpact();
+
+    if (index != _currentIndex) {
+      setState(() {
+        _currentIndex = index;
+      });
+      _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  void _createPost() {
+    HapticFeedback.mediumImpact();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const PostCreateScreen(),
       ),
     );
   }

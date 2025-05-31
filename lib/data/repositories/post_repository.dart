@@ -7,19 +7,33 @@ class PostRepository {
   final FirebaseFirestore _firestore = FirebaseService.firestore;
   final _uuid = const Uuid();
 
-  // Obtener feed de posts (últimos posts públicos)
-  Stream<List<PostModel>> getFeedPosts({int limit = 20}) {
-    return FirebaseService.posts
-        .where('isPublic', isEqualTo: true)
-        .orderBy('createdAt', descending: true)
-        .limit(limit)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-        .map((doc) => PostModel.fromFirestore(doc))
-        .toList());
+  // Obtener feed de publicaciones (timeline principal)
+  Future<List<PostModel>> getFeedPosts({
+    int page = 0,
+    int limit = 10,
+  }) async {
+    try {
+      Query query = FirebaseService.posts
+          .where('isPublic', isEqualTo: true)
+          .orderBy('createdAt', descending: true)
+          .limit(limit);
+
+      if (page > 0) {
+        // Para paginación, necesitarías implementar cursor-based pagination
+        // Por simplicidad, usamos offset básico
+        query = query.startAfter([DateTime.now().subtract(Duration(days: page))]);
+      }
+
+      final snapshot = await query.get();
+      return snapshot.docs
+          .map((doc) => PostModel.fromFirestore(doc))
+          .toList();
+    } catch (e) {
+      throw Exception('Error obteniendo feed: $e');
+    }
   }
 
-  // Obtener posts de un usuario específico
+  // Obtener publicaciones del usuario
   Stream<List<PostModel>> getUserPosts(String userId) {
     return FirebaseService.posts
         .where('authorId', isEqualTo: userId)
@@ -30,7 +44,7 @@ class PostRepository {
         .toList());
   }
 
-  // Obtener posts de una mascota específica
+  // Obtener publicaciones de una mascota específica
   Stream<List<PostModel>> getPetPosts(String petId) {
     return FirebaseService.posts
         .where('petId', isEqualTo: petId)
@@ -41,84 +55,300 @@ class PostRepository {
         .toList());
   }
 
-  // Crear nuevo post
+  // Crear nueva publicación
   Future<String> createPost(PostModel post) async {
     try {
       final postId = _uuid.v4();
-      await FirebaseService.posts.doc(postId).set(post.toFirestore());
+      final newPost = post.copyWith();
+
+      await FirebaseService.posts.doc(postId).set({
+        ...newPost.toFirestore(),
+        'id': postId,
+      });
+
       return postId;
     } catch (e) {
-      throw Exception('Error creando post: $e');
+      throw Exception('Error creando publicación: $e');
     }
   }
 
-  // Actualizar post
+  // Actualizar publicación
   Future<void> updatePost(PostModel post) async {
     try {
       await FirebaseService.posts.doc(post.id).update(post.toFirestore());
     } catch (e) {
-      throw Exception('Error actualizando post: $e');
+      throw Exception('Error actualizando publicación: $e');
     }
   }
 
-  // Eliminar post
-  Future<void> deletePost(String postId) async {
+  // Eliminar publicación
+  Future<void> deletePost(String postId, String authorId) async {
     try {
+      final doc = await FirebaseService.posts.doc(postId).get();
+      if (!doc.exists) {
+        throw Exception('Publicación no encontrada');
+      }
+
+      final post = PostModel.fromFirestore(doc);
+      if (post.authorId != authorId) {
+        throw Exception('No tienes permisos para eliminar esta publicación');
+      }
+
       await FirebaseService.posts.doc(postId).delete();
     } catch (e) {
-      throw Exception('Error eliminando post: $e');
+      throw Exception('Error eliminando publicación: $e');
     }
   }
 
-  // Dar/quitar like a un post
+  // Toggle like en publicación
   Future<void> toggleLike(String postId, String userId) async {
     try {
-      final postRef = FirebaseService.posts.doc(postId);
-      final doc = await postRef.get();
+      final docRef = FirebaseService.posts.doc(postId);
 
-      if (doc.exists) {
-        final post = PostModel.fromFirestore(doc);
-        List<String> newLikes = List.from(post.likes);
-
-        if (newLikes.contains(userId)) {
-          newLikes.remove(userId);
-        } else {
-          newLikes.add(userId);
+      await _firestore.runTransaction((transaction) async {
+        final doc = await transaction.get(docRef);
+        if (!doc.exists) {
+          throw Exception('Publicación no encontrada');
         }
 
-        await postRef.update({
-          'likes': newLikes,
+        final post = PostModel.fromFirestore(doc);
+        List<String> likes = List.from(post.likes);
+
+        if (likes.contains(userId)) {
+          likes.remove(userId);
+        } else {
+          likes.add(userId);
+        }
+
+        transaction.update(docRef, {
+          'likes': likes,
           'updatedAt': Timestamp.now(),
         });
-      }
+      });
     } catch (e) {
-      throw Exception('Error toggle like: $e');
+      throw Exception('Error actualizando like: $e');
     }
   }
 
-  // Buscar posts por hashtag
-  Stream<List<PostModel>> searchPostsByHashtag(String hashtag) {
+  // Agregar comentario
+  Future<void> addComment(String postId, String comment, String userId) async {
+    try {
+      final commentId = _uuid.v4();
+
+      // Crear el comentario en la subcolección
+      await FirebaseService.posts
+          .doc(postId)
+          .collection('comments')
+          .doc(commentId)
+          .set({
+        'id': commentId,
+        'postId': postId,
+        'authorId': userId,
+        'content': comment,
+        'createdAt': Timestamp.now(),
+        'updatedAt': Timestamp.now(),
+      });
+
+      // Incrementar contador de comentarios
+      await FirebaseService.posts.doc(postId).update({
+        'commentsCount': FieldValue.increment(1),
+        'updatedAt': Timestamp.now(),
+      });
+    } catch (e) {
+      throw Exception('Error agregando comentario: $e');
+    }
+  }
+
+  // Buscar publicaciones
+  Future<List<PostModel>> searchPosts({
+    String? query,
+    List<String>? hashtags,
+    PostType? type,
+    String? location,
+  }) async {
+    try {
+      Query baseQuery = FirebaseService.posts.where('isPublic', isEqualTo: true);
+
+      // Filtrar por tipo si se especifica
+      if (type != null) {
+        baseQuery = baseQuery.where('type', isEqualTo: type.toString().split('.').last);
+      }
+
+      // Filtrar por hashtags si se especifican
+      if (hashtags != null && hashtags.isNotEmpty) {
+        baseQuery = baseQuery.where('hashtags', arrayContainsAny: hashtags);
+      }
+
+      final snapshot = await baseQuery
+          .orderBy('createdAt', descending: true)
+          .limit(50)
+          .get();
+
+      List<PostModel> posts = snapshot.docs
+          .map((doc) => PostModel.fromFirestore(doc))
+          .toList();
+
+      // Filtro de texto en cliente (Firestore no soporta full-text search nativo)
+      if (query != null && query.isNotEmpty) {
+        posts = posts.where((post) =>
+            post.content.toLowerCase().contains(query.toLowerCase())
+        ).toList();
+      }
+
+      return posts;
+    } catch (e) {
+      throw Exception('Error buscando publicaciones: $e');
+    }
+  }
+
+  // Obtener publicaciones por hashtag
+  Future<List<PostModel>> getPostsByHashtag(String hashtag) async {
+    try {
+      final snapshot = await FirebaseService.posts
+          .where('hashtags', arrayContains: hashtag)
+          .where('isPublic', isEqualTo: true)
+          .orderBy('createdAt', descending: true)
+          .limit(30)
+          .get();
+
+      return snapshot.docs
+          .map((doc) => PostModel.fromFirestore(doc))
+          .toList();
+    } catch (e) {
+      throw Exception('Error obteniendo posts por hashtag: $e');
+    }
+  }
+
+  // Reportar publicación
+  Future<void> reportPost(String postId, String reason, String reporterId) async {
+    try {
+      final reportId = _uuid.v4();
+
+      await _firestore.collection('reports').doc(reportId).set({
+        'id': reportId,
+        'postId': postId,
+        'reporterId': reporterId,
+        'reason': reason,
+        'status': 'pending',
+        'createdAt': Timestamp.now(),
+      });
+    } catch (e) {
+      throw Exception('Error reportando publicación: $e');
+    }
+  }
+
+  // Obtener publicaciones de mascotas perdidas
+  Future<List<PostModel>> getLostPetPosts() async {
+    try {
+      final snapshot = await FirebaseService.posts
+          .where('type', isEqualTo: 'announcement')
+          .where('hashtags', arrayContains: 'MascotaPerdida')
+          .where('isPublic', isEqualTo: true)
+          .orderBy('createdAt', descending: true)
+          .limit(20)
+          .get();
+
+      return snapshot.docs
+          .map((doc) => PostModel.fromFirestore(doc))
+          .toList();
+    } catch (e) {
+      throw Exception('Error obteniendo mascotas perdidas: $e');
+    }
+  }
+
+  // Obtener comentarios de una publicación
+  Stream<List<CommentModel>> getPostComments(String postId) {
     return FirebaseService.posts
-        .where('hashtags', arrayContains: hashtag.toLowerCase())
-        .where('isPublic', isEqualTo: true)
-        .orderBy('createdAt', descending: true)
+        .doc(postId)
+        .collection('comments')
+        .orderBy('createdAt', descending: false)
         .snapshots()
         .map((snapshot) => snapshot.docs
-        .map((doc) => PostModel.fromFirestore(doc))
+        .map((doc) => CommentModel.fromFirestore(doc))
         .toList());
   }
 
-  // Obtener post por ID
-  Future<PostModel?> getPostById(String postId) async {
+  // Obtener publicaciones populares (más likes)
+  Future<List<PostModel>> getPopularPosts({int limit = 10}) async {
     try {
-      final doc = await FirebaseService.posts.doc(postId).get();
-      if (doc.exists) {
-        return PostModel.fromFirestore(doc);
-      }
-      return null;
+      final snapshot = await FirebaseService.posts
+          .where('isPublic', isEqualTo: true)
+          .orderBy('likes', descending: true)
+          .limit(limit)
+          .get();
+
+      return snapshot.docs
+          .map((doc) => PostModel.fromFirestore(doc))
+          .toList();
     } catch (e) {
-      print('Error getting post: $e');
-      return null;
+      throw Exception('Error obteniendo posts populares: $e');
     }
+  }
+
+  // Obtener posts cercanos por ubicación
+  Future<List<PostModel>> getNearbyPosts({
+    required double latitude,
+    required double longitude,
+    double radiusInKm = 10.0,
+  }) async {
+    try {
+      // Firestore no tiene consultas geoespaciales nativas eficientes
+      // Para una implementación completa, considerarías usar GeoFlutterFire
+      final snapshot = await FirebaseService.posts
+          .where('isPublic', isEqualTo: true)
+          .where('location', isNotEqualTo: null)
+          .orderBy('location')
+          .orderBy('createdAt', descending: true)
+          .limit(50)
+          .get();
+
+      return snapshot.docs
+          .map((doc) => PostModel.fromFirestore(doc))
+          .toList();
+    } catch (e) {
+      throw Exception('Error obteniendo posts cercanos: $e');
+    }
+  }
+}
+
+// Modelo para comentarios
+class CommentModel {
+  final String id;
+  final String postId;
+  final String authorId;
+  final String content;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  CommentModel({
+    required this.id,
+    required this.postId,
+    required this.authorId,
+    required this.content,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  factory CommentModel.fromFirestore(DocumentSnapshot doc) {
+    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+
+    return CommentModel(
+      id: doc.id,
+      postId: data['postId'] ?? '',
+      authorId: data['authorId'] ?? '',
+      content: data['content'] ?? '',
+      createdAt: (data['createdAt'] as Timestamp).toDate(),
+      updatedAt: (data['updatedAt'] as Timestamp).toDate(),
+    );
+  }
+
+  Map<String, dynamic> toFirestore() {
+    return {
+      'postId': postId,
+      'authorId': authorId,
+      'content': content,
+      'createdAt': Timestamp.fromDate(createdAt),
+      'updatedAt': Timestamp.fromDate(updatedAt),
+    };
   }
 }
