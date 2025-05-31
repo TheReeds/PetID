@@ -225,7 +225,27 @@ class AuthProvider extends ChangeNotifier {
       return false;
     }
   }
+  Future<bool> signInWithGoogle() async {
+    try {
+      _setState(AuthState.loading);
+      _clearError();
 
+      final credential = await _authRepository.signInWithGoogle();
+
+      if (credential?.user != null) {
+        await _loadUserData(credential!.user!.uid);
+        _setState(AuthState.authenticated);
+        return true;
+      }
+
+      _setState(AuthState.unauthenticated);
+      return false;
+    } catch (e) {
+      _setError(e.toString());
+      _setState(AuthState.error);
+      return false;
+    }
+  }
   // Recargar datos del usuario
   Future<void> refreshUserData() async {
     if (_firebaseUser != null) {

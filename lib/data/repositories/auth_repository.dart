@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
 import '../services/firebase_service.dart';
+import '../services/google_signin_service.dart';
 import '../services/storage_service.dart';
 
 class AuthRepository {
@@ -87,7 +88,17 @@ class AuthRepository {
 
   // Cerrar sesión
   Future<void> signOut() async {
-    await _auth.signOut();
+    try {
+      // Cerrar sesión de Google si está conectado
+      if (await GoogleSignInService.isSignedInWithGoogle()) {
+        await GoogleSignInService.signOutGoogle();
+      }
+
+      // Cerrar sesión de Firebase
+      await _auth.signOut();
+    } catch (e) {
+      throw Exception('Error al cerrar sesión: $e');
+    }
   }
 
   // Obtener datos del usuario actual
@@ -250,6 +261,11 @@ class AuthRepository {
     if (user == null) throw Exception('Usuario no autenticado');
 
     try {
+      // Desconectar de Google si está conectado
+      if (await GoogleSignInService.isSignedInWithGoogle()) {
+        await GoogleSignInService.disconnectGoogle();
+      }
+
       // Eliminar datos de Firestore
       await FirebaseService.users.doc(user.uid).delete();
 
@@ -259,4 +275,54 @@ class AuthRepository {
       throw _handleAuthException(e);
     }
   }
+  Future<UserCredential?> signInWithGoogle() async {
+    try {
+      final credential = await GoogleSignInService.signInWithGoogle();
+
+      if (credential?.user != null) {
+        // Verificar si es la primera vez que el usuario inicia sesión
+        final userDoc = await FirebaseService.users.doc(credential!.user!.uid).get();
+
+        if (!userDoc.exists) {
+          // Crear perfil básico para nuevos usuarios de Google
+          await _createUserProfileFromGoogle(credential.user!);
+        } else {
+          // Actualizar la información si es necesario
+          await _updateUserFromGoogle(credential.user!);
+        }
+      }
+
+      return credential;
+    } catch (e) {
+      throw Exception('Error en Google Sign In: $e');
+    }
+  }
+
+  // Crear perfil para usuarios que se registran con Google
+  Future<void> _createUserProfileFromGoogle(User user) async {
+    final userModel = UserModel(
+      id: user.uid,
+      email: user.email!,
+      displayName: user.displayName ?? 'Usuario',
+      fullName: user.displayName,
+      photoURL: user.photoURL,
+      phone: null,
+      address: null,
+      dateOfBirth: null,
+      gender: null,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+
+    await FirebaseService.users.doc(user.uid).set(userModel.toFirestore());
+  }
+
+  // Actualizar información de usuarios existentes de Google
+  Future<void> _updateUserFromGoogle(User user) async {
+    await FirebaseService.users.doc(user.uid).update({
+      'photoURL': user.photoURL,
+      'updatedAt': Timestamp.fromDate(DateTime.now()),
+    });
+  }
+
 }

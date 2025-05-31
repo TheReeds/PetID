@@ -21,8 +21,8 @@ dependencies:
   firebase_messaging: ^15.2.6
 
   # Autenticación
-  google_sign_in: ^6.0.2
-
+  google_sign_in: ^6.1.6
+  crypto: ^3.0.3
   # UI y Navigation
   provider: ^6.1.1
   go_router: ^15.1.2

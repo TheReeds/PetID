@@ -830,16 +830,18 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         ],
       ),
       child: TextButton(
-        onPressed: () async {
+        onPressed: authProvider.isLoading
+            ? null
+            : () async {
           HapticFeedback.lightImpact();
-          // Implementar Google Sign In cuando esté disponible
-          _showSnackBar('Google Sign In próximamente disponible', isError: false);
 
-          // Descomenta cuando implementes Google Sign In:
-          // final success = await authProvider.signInWithGoogle();
-          // if (success) {
-          //   _showSnackBar('¡Bienvenido!');
-          // }
+          final success = await authProvider.signInWithGoogle();
+          if (success) {
+            _showSnackBar('¡Bienvenido!');
+            // El Consumer en main.dart manejará la navegación automáticamente
+          } else if (authProvider.errorMessage != null) {
+            _showSnackBar(authProvider.errorMessage!, isError: true);
+          }
         },
         style: TextButton.styleFrom(
           backgroundColor: Colors.white,
@@ -848,7 +850,16 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             borderRadius: BorderRadius.circular(18),
           ),
         ),
-        child: Row(
+        child: authProvider.isLoading
+            ? const SizedBox(
+          width: 24,
+          height: 24,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4A7AA7)),
+          ),
+        )
+            : Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
@@ -856,18 +867,35 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
               height: 24,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(6),
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF4285F4), Color(0xFF34A853)],
-                ),
+                color: Colors.white,
               ),
-              child: const Center(
-                child: Text(
-                  'G',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: Image.asset(
+                  'assets/images/google_logo.png', // Necesitarás agregar este asset
+                  width: 24,
+                  height: 24,
+                  errorBuilder: (context, error, stackTrace) {
+                    // Fallback si no tienes la imagen
+                    return Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(6),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF4285F4), Color(0xFF34A853)],
+                        ),
+                      ),
+                      child: const Center(
+                        child: Text(
+                          'G',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),

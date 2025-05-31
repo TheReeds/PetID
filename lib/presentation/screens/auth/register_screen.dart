@@ -237,7 +237,6 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
 
     if (success) {
       _showSnackBar('¡Registro exitoso! Bienvenido a PetID');
-      Navigator.of(context).pop(); // Volver a la pantalla anterior
     }
   }
 
@@ -403,11 +402,14 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                           ),
                           child: TextField(
                             enabled: false,
+                            controller: TextEditingController(
+                              text: selectedDate != null
+                                  ? '${selectedDate!.day.toString().padLeft(2, '0')}/${selectedDate!.month.toString().padLeft(2, '0')}/${selectedDate!.year}'
+                                  : '',
+                            ),
                             decoration: InputDecoration(
                               labelText: 'Fecha de nacimiento',
-                              hintText: selectedDate != null
-                                  ? '${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}'
-                                  : 'Selecciona tu fecha',
+                              hintText: 'DD/MM/AAAA',
                               prefixIcon: Container(
                                 margin: const EdgeInsets.all(14),
                                 padding: const EdgeInsets.all(10),
@@ -435,7 +437,9 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                               disabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(18),
                                 borderSide: BorderSide(
-                                  color: Colors.grey.withOpacity(0.15),
+                                  color: selectedDate != null
+                                      ? const Color(0xFF4A7AA7).withOpacity(0.3)
+                                      : Colors.grey.withOpacity(0.15),
                                   width: 1,
                                 ),
                               ),
@@ -446,10 +450,19 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                                 fontSize: 15,
                                 fontWeight: FontWeight.w500,
                               ),
+                              hintStyle: TextStyle(
+                                color: Colors.grey[400],
+                                fontSize: 16,
+                              ),
                               contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 24,
                                 vertical: 20,
                               ),
+                            ),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              color: Color(0xFF333333),
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ),
@@ -472,6 +485,7 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                           value: selectedGender,
                           decoration: InputDecoration(
                             labelText: 'Género',
+                            hintText: 'Selecciona tu género',
                             prefixIcon: Container(
                               margin: const EdgeInsets.all(14),
                               padding: const EdgeInsets.all(10),
@@ -479,7 +493,7 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                                 color: const Color(0xFF4A7AA7).withOpacity(0.12),
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              child: const Text('⚧', style: TextStyle(fontSize: 18)),
+                              child: _getGenderIcon(selectedGender),
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(18),
@@ -506,22 +520,67 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                               fontSize: 15,
                               fontWeight: FontWeight.w500,
                             ),
+                            hintStyle: TextStyle(
+                              color: Colors.grey[400],
+                              fontSize: 16,
+                            ),
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 24,
                               vertical: 20,
                             ),
                           ),
-                          items: ['Masculino', 'Femenino', 'Otro']
-                              .map((gender) => DropdownMenuItem(
-                            value: gender,
-                            child: Text(gender),
-                          ))
-                              .toList(),
+                          items: [
+                            DropdownMenuItem(
+                              value: 'Masculino',
+                              child: Row(
+                                children: [
+                                  Text('👨', style: TextStyle(fontSize: 18)),
+                                  SizedBox(width: 12),
+                                  Text('Masculino'),
+                                ],
+                              ),
+                            ),
+                            DropdownMenuItem(
+                              value: 'Femenino',
+                              child: Row(
+                                children: [
+                                  Text('👩', style: TextStyle(fontSize: 18)),
+                                  SizedBox(width: 12),
+                                  Text('Femenino'),
+                                ],
+                              ),
+                            ),
+                            DropdownMenuItem(
+                              value: 'Otro',
+                              child: Row(
+                                children: [
+                                  Text('🏳️‍⚧️', style: TextStyle(fontSize: 18)),
+                                  SizedBox(width: 12),
+                                  Text('Otro'),
+                                ],
+                              ),
+                            ),
+                            DropdownMenuItem(
+                              value: 'Prefiero no decirlo',
+                              child: Row(
+                                children: [
+                                  Text('❓', style: TextStyle(fontSize: 18)),
+                                  SizedBox(width: 12),
+                                  Text('Prefiero no decirlo'),
+                                ],
+                              ),
+                            ),
+                          ],
                           onChanged: (value) {
                             setState(() {
                               selectedGender = value;
                             });
                           },
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Color(0xFF333333),
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 20),
@@ -601,7 +660,20 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
       ),
     );
   }
-
+  Widget _getGenderIcon(String? gender) {
+    switch (gender) {
+      case 'Masculino':
+        return const Text('👨', style: TextStyle(fontSize: 18));
+      case 'Femenino':
+        return const Text('👩', style: TextStyle(fontSize: 18));
+      case 'Otro':
+        return const Text('🏳️‍⚧️', style: TextStyle(fontSize: 18));
+      case 'Prefiero no decirlo':
+        return const Text('❓', style: TextStyle(fontSize: 18));
+      default:
+        return const Text('⚧', style: TextStyle(fontSize: 18));
+    }
+  }
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,

@@ -57,7 +57,17 @@
 	<string>La app necesita acceso a tus fotos para que puedas subir imágenes.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>La app necesita tu ubicación para mostrar servicios cercanos.</string>
-
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>REVERSED_CLIENT_ID</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>com.googleusercontent.apps.933930385034-ipaqca7kjpt8erlpqsa6kbs2hptcvnv5</string>
+            </array>
+        </dict>
+    </array>
 	<!-- Notificaciones Push -->
 	<key>UIBackgroundModes</key>
 	<array>
