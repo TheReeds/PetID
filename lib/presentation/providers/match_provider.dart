@@ -1,12 +1,23 @@
+import 'package:apppetid/presentation/providers/user_provider.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../data/models/pet_model.dart';
 import '../../data/models/match_model.dart';
 import '../../data/repositories/match_repository.dart';
+import 'auth_provider.dart';
+import 'package:uuid/uuid.dart';
 
 enum MatchState { idle, loading, loaded, error }
 
 class MatchProvider extends ChangeNotifier {
   final MatchRepository _matchRepository = MatchRepository();
+  final _uuid = const Uuid();
+  BuildContext? _context;
+
+  void initialize(BuildContext context) {
+    _context = context;
+  }
 
   MatchState _state = MatchState.idle;
   List<PetModel> _potentialMatches = [];
@@ -82,6 +93,8 @@ class MatchProvider extends ChangeNotifier {
   Future<bool> sendMatchRequest({
     required String fromPetId,
     required String toPetId,
+    required String fromUserId,
+    required String toUserId,
     required MatchType type,
     String? message,
   }) async {
@@ -92,6 +105,8 @@ class MatchProvider extends ChangeNotifier {
       final matchId = await _matchRepository.createMatchRequest(
         fromPetId: fromPetId,
         toPetId: toPetId,
+        fromUserId: fromUserId, // AGREGAR
+        toUserId: toUserId,     // AGREGAR
         type: type,
         message: message,
       );
@@ -213,11 +228,102 @@ class MatchProvider extends ChangeNotifier {
       return false;
     }
   }
+  Future<void> findPotentialUserMatches({
+    int? minAge,
+    int? maxAge,
+    double? maxDistance,
+    List<String>? interests,
+  }) async {
+    try {
+      _setState(MatchState.loading);
+      _clearError();
+
+      if (_context == null) {
+        throw Exception('Context no inicializado');
+      }
+
+      // Obtener usuarios del UserProvider
+      final userProvider = Provider.of<UserProvider>(_context!, listen: false);
+      await userProvider.loadSuggestedUsers();
+
+      _setState(MatchState.loaded);
+    } catch (e) {
+      _setError('Error buscando usuarios: $e');
+    }
+  }
+
+// Enviar solicitud de match a usuario
+  Future<bool> sendUserMatchRequest({
+    required String fromUserId, // AGREGAR ESTE PARÁMETRO
+    required String toUserId,
+    required MatchType type,
+    String? message,
+  }) async {
+    try {
+      _setState(MatchState.loading);
+      _clearError();
+
+      final matchId = await _matchRepository.createMatchRequest(
+        fromUserId: fromUserId,
+        toUserId: toUserId,
+        type: type,
+        message: message,
+      );
+
+      if (matchId.isNotEmpty) {
+        await _reloadCurrentUserMatches();
+        _setState(MatchState.loaded);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      _setError('Error enviando solicitud: $e');
+      return false;
+    }
+  }
 
   // Recargar matches del usuario actual
   Future<void> _reloadCurrentUserMatches() async {
-    // Esta función debería ser llamada desde el AuthProvider o donde tengas el userId actual
-    // Por ahora queda como placeholder
+    if (_context == null) return;
+
+    try {
+      // Obtener el userId actual del AuthProvider
+      final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
+      final currentUserId = authProvider.currentUser?.id;
+
+      if (currentUserId != null) {
+        await loadUserMatches(currentUserId);
+      }
+    } catch (e) {
+      print('Error recargando matches del usuario: $e');
+    }
+  }
+  Future<void> findPotentialUsersForMatch({
+    required String currentUserId,
+    int? minAge,
+    int? maxAge,
+    double? maxDistance,
+    List<String>? interests,
+  }) async {
+    try {
+      _setState(MatchState.loading);
+      _clearError();
+
+      final users = await _matchRepository.findPotentialUserMatches(
+        currentUserId: currentUserId,
+        minAge: minAge,
+        maxAge: maxAge,
+        maxDistance: maxDistance,
+        interests: interests,
+      );
+
+      // Convertir UserModel a PetModel o crear una nueva lista para usuarios
+      // O agregar una nueva variable de estado para usuarios potenciales
+
+      _setState(MatchState.loaded);
+    } catch (e) {
+      _setError('Error buscando usuarios potenciales: $e');
+    }
   }
 
   // Métodos privados de estado
@@ -237,4 +343,48 @@ class MatchProvider extends ChangeNotifier {
   }
 
   void clearError() => _clearError();
+
+  Color getMatchTypeColor(MatchType type) {
+    switch (type) {
+      case MatchType.mating:
+        return Colors.pink;
+      case MatchType.playdate:
+        return Colors.orange;
+      case MatchType.adoption:
+        return Colors.green;
+      case MatchType.friendship:
+        return Colors.blue;
+    // NUEVOS TIPOS PARA USUARIOS:
+      case MatchType.petOwnerFriendship:
+        return Colors.blue;
+      case MatchType.petActivity:
+        return Colors.orange;
+      case MatchType.petCare:
+        return Colors.green;
+      case MatchType.socialMeet:
+        return Colors.purple;
+    }
+  }
+
+  String getMatchTypeText(MatchType type) {
+    switch (type) {
+      case MatchType.mating:
+        return 'Reproducción';
+      case MatchType.playdate:
+        return 'Playdate';
+      case MatchType.adoption:
+        return 'Adopción';
+      case MatchType.friendship:
+        return 'Amistad';
+    // NUEVOS TIPOS PARA USUARIOS:
+      case MatchType.petOwnerFriendship:
+        return 'Amistad';
+      case MatchType.petActivity:
+        return 'Actividades';
+      case MatchType.petCare:
+        return 'Cuidado';
+      case MatchType.socialMeet:
+        return 'Encuentro';
+    }
+  }
 }

@@ -4,31 +4,26 @@ import 'package:provider/provider.dart';
 import '../../providers/match_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/user_provider.dart';
-import '../../../data/models/pet_model.dart';
+import '../../../data/models/user_model.dart';
 import '../../../data/models/match_model.dart';
 import 'dart:math' as math;
 
-class PetDiscoveryScreen extends StatefulWidget {
-  final PetModel selectedPet;
-
-  const PetDiscoveryScreen({
-    super.key,
-    required this.selectedPet,
-  });
+class UserDiscoveryScreen extends StatefulWidget {
+  const UserDiscoveryScreen({super.key});
 
   @override
-  State<PetDiscoveryScreen> createState() => _PetDiscoveryScreenState();
+  State<UserDiscoveryScreen> createState() => _UserDiscoveryScreenState();
 }
 
-class _PetDiscoveryScreenState extends State<PetDiscoveryScreen>
+class _UserDiscoveryScreenState extends State<UserDiscoveryScreen>
     with TickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
-  late Animation<double> _rotationAnimation;
 
   int _currentIndex = 0;
   Offset _dragOffset = Offset.zero;
   bool _isDragging = false;
+  List<UserModel> _potentialMatches = [];
 
   @override
   void initState() {
@@ -46,14 +41,6 @@ class _PetDiscoveryScreenState extends State<PetDiscoveryScreen>
       curve: Curves.easeInOut,
     ));
 
-    _rotationAnimation = Tween<double>(
-      begin: 0.0,
-      end: 0.1,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    ));
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadPotentialMatches();
     });
@@ -66,55 +53,44 @@ class _PetDiscoveryScreenState extends State<PetDiscoveryScreen>
   }
 
   Future<void> _loadPotentialMatches() async {
-    final matchProvider = Provider.of<MatchProvider>(context, listen: false);
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
 
-    await matchProvider.findPotentialMatches(
-      petId: widget.selectedPet.id,
-      type: widget.selectedPet.type,
-      size: widget.selectedPet.size,
-      forMating: widget.selectedPet.isForMating,
-      forPlaydate: true,
-    );
+    // Cargar usuarios sugeridos
+    await userProvider.loadSuggestedUsers();
+
+    setState(() {
+      _potentialMatches = userProvider.suggestedUsers;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<MatchProvider>(
-      builder: (context, matchProvider, child) {
-        if (matchProvider.isLoading) {
-          return const Center(
-            child: CircularProgressIndicator(color: Color(0xFF4A7AA7)),
-          );
-        }
+    if (_potentialMatches.isEmpty) {
+      return _buildNoMoreUsersState();
+    }
 
-        if (matchProvider.potentialMatches.isEmpty) {
-          return _buildNoMorePetsState();
-        }
+    return Stack(
+      children: [
+        // Cards de usuarios
+        for (int i = math.min(_currentIndex + 2, _potentialMatches.length - 1);
+        i >= _currentIndex;
+        i--)
+          _buildUserCard(
+            _potentialMatches[i],
+            i - _currentIndex,
+            i == _currentIndex,
+          ),
 
-        return Stack(
-          children: [
-            // Cards de mascotas
-            for (int i = math.min(_currentIndex + 2, matchProvider.potentialMatches.length - 1);
-            i >= _currentIndex;
-            i--)
-              _buildPetCard(
-                matchProvider.potentialMatches[i],
-                i - _currentIndex,
-                i == _currentIndex,
-              ),
+        // Indicadores de acción
+        if (_isDragging) _buildActionIndicators(),
 
-            // Indicadores de acción
-            if (_isDragging) _buildActionIndicators(),
-
-            // Botones de acción
-            _buildActionButtons(),
-          ],
-        );
-      },
+        // Botones de acción
+        _buildActionButtons(),
+      ],
     );
   }
 
-  Widget _buildPetCard(PetModel pet, int stackIndex, bool isActive) {
+  Widget _buildUserCard(UserModel user, int stackIndex, bool isActive) {
     final scale = 1.0 - (stackIndex * 0.05);
     final yOffset = stackIndex * 10.0;
 
@@ -142,19 +118,18 @@ class _PetDiscoveryScreenState extends State<PetDiscoveryScreen>
             borderRadius: BorderRadius.circular(20),
             child: Stack(
               children: [
-                // Imagen de fondo
+                // Imagen de fondo del usuario
                 Container(
                   width: double.infinity,
                   height: double.infinity,
-                  color: Colors.grey.shade200,
-                  child: pet.photos.isNotEmpty
+                  child: user.photoURL != null
                       ? Image.network(
-                    pet.photos.first,
+                    user.photoURL!,
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) =>
-                        _buildPlaceholderImage(pet),
+                        _buildPlaceholderImage(user),
                   )
-                      : _buildPlaceholderImage(pet),
+                      : _buildPlaceholderImage(user),
                 ),
 
                 // Gradient overlay
@@ -174,12 +149,12 @@ class _PetDiscoveryScreenState extends State<PetDiscoveryScreen>
                   ),
                 ),
 
-                // Información de la mascota
+                // Información del usuario
                 Positioned(
                   bottom: 0,
                   left: 0,
                   right: 0,
-                  child: _buildPetInfo(pet),
+                  child: _buildUserInfo(user),
                 ),
               ],
             ),
@@ -206,9 +181,9 @@ class _PetDiscoveryScreenState extends State<PetDiscoveryScreen>
           const threshold = 100.0;
           if (_dragOffset.dx.abs() > threshold) {
             if (_dragOffset.dx > 0) {
-              _handleLike(pet);
+              _handleLike(user);
             } else {
-              _handlePass(pet);
+              _handlePass(user);
             }
           } else {
             setState(() {
@@ -237,21 +212,25 @@ class _PetDiscoveryScreenState extends State<PetDiscoveryScreen>
     return card;
   }
 
-  Widget _buildPlaceholderImage(PetModel pet) {
+  Widget _buildPlaceholderImage(UserModel user) {
     return Container(
       color: const Color(0xFF4A7AA7).withOpacity(0.1),
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.pets,
-              size: 80,
-              color: const Color(0xFF4A7AA7).withOpacity(0.5),
+            CircleAvatar(
+              radius: 60,
+              backgroundColor: const Color(0xFF4A7AA7).withOpacity(0.2),
+              child: Icon(
+                Icons.person,
+                size: 80,
+                color: const Color(0xFF4A7AA7).withOpacity(0.7),
+              ),
             ),
             const SizedBox(height: 16),
             Text(
-              pet.name,
+              user.displayName,
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -264,7 +243,11 @@ class _PetDiscoveryScreenState extends State<PetDiscoveryScreen>
     );
   }
 
-  Widget _buildPetInfo(PetModel pet) {
+  Widget _buildUserInfo(UserModel user) {
+    final age = user.dateOfBirth != null
+        ? DateTime.now().year - user.dateOfBirth!.year
+        : null;
+
     return Container(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -277,115 +260,137 @@ class _PetDiscoveryScreenState extends State<PetDiscoveryScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      pet.name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            user.displayName,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (user.isVerified) ...[
+                          const SizedBox(width: 8),
+                          const Icon(
+                            Icons.verified,
+                            color: Colors.blue,
+                            size: 24,
+                          ),
+                        ],
+                      ],
                     ),
-                    Text(
-                      '${pet.displayAge} • ${pet.breed}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
+                    if (age != null)
+                      Text(
+                        '$age años',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: _getGenderColor(pet.sex),  // ← Cambiar pet.gender por pet.sex
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  pet.sex.toString().split('.').last.toUpperCase(),  // ← Cambiar pet.gender por pet.sex
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
+              if (user.gender != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _getGenderColor(user.gender!),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    user.gender!.toUpperCase(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Tags de características
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _buildInfoTag(Icons.straighten, '${pet.size.toString().split('.').last}'),
-              if (pet.isVaccinated) _buildInfoTag(Icons.medical_services, 'Vacunado'),
-              if (pet.isNeutered) _buildInfoTag(Icons.healing, 'Esterilizado'),
-              if (pet.isForMating) _buildInfoTag(Icons.favorite, 'Reproducción'),
-              if (pet.isForAdoption) _buildInfoTag(Icons.home, 'Adopción'),
             ],
           ),
 
-          if (pet.description.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Text(
-              pet.description,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                height: 1.3,
-              ),
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
+          if (user.address != null) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.location_on, color: Colors.white, size: 16),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    user.address!,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
           ],
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
-          // Información del dueño
-          Consumer<UserProvider>(
-            builder: (context, userProvider, child) {
-              final owner = userProvider.getUserForPost(pet.ownerId);
-              return Row(
+          // Información de mascotas
+          if (user.pets.isNotEmpty) ...[
+            Row(
+              children: [
+                const Icon(Icons.pets, color: Colors.white, size: 16),
+                const SizedBox(width: 6),
+                Text(
+                  '${user.pets.length} mascota${user.pets.length == 1 ? '' : 's'}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+          ],
+
+          // Intereses (si existen en el modelo extendido)
+          // if (user.interests.isNotEmpty) ...[
+          //   Wrap(
+          //     spacing: 8,
+          //     runSpacing: 8,
+          //     children: user.interests.take(3).map((interest) =>
+          //       _buildInfoTag(Icons.favorite, interest)
+          //     ).toList(),
+          //   ),
+          //   const SizedBox(height: 12),
+          // ],
+
+          // Botón para ver más información
+          Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white.withOpacity(0.3)),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  CircleAvatar(
-                    radius: 16,
-                    backgroundImage: owner?.photoURL != null
-                        ? NetworkImage(owner!.photoURL!)
-                        : null,
-                    backgroundColor: Colors.white.withOpacity(0.2),
-                    child: owner?.photoURL == null
-                        ? const Icon(Icons.person, color: Colors.white, size: 16)
-                        : null,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Dueño: ${owner?.displayName ?? "Usuario"}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                      ),
+                  Icon(Icons.info_outline, color: Colors.white, size: 16),
+                  SizedBox(width: 6),
+                  Text(
+                    'Ver más detalles',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                  if (pet.location != null)
-                    Row(
-                      children: [
-                        const Icon(Icons.location_on, color: Colors.white, size: 16),
-                        const SizedBox(width: 4),
-                        Text(
-                          '2.5 km', // Calcular distancia real
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
                 ],
-              );
-            },
+              ),
+            ),
           ),
         ],
       ),
@@ -419,7 +424,6 @@ class _PetDiscoveryScreenState extends State<PetDiscoveryScreen>
   }
 
   Widget _buildActionIndicators() {
-    final screenWidth = MediaQuery.of(context).size.width;
     final opacity = (_dragOffset.dx.abs() / 100).clamp(0.0, 1.0);
 
     return Positioned.fill(
@@ -496,7 +500,7 @@ class _PetDiscoveryScreenState extends State<PetDiscoveryScreen>
         children: [
           // Botón Pass
           GestureDetector(
-            onTap: () => _handlePass(_getCurrentPet()),
+            onTap: () => _handlePass(_getCurrentUser()),
             child: Container(
               width: 60,
               height: 60,
@@ -521,7 +525,7 @@ class _PetDiscoveryScreenState extends State<PetDiscoveryScreen>
 
           // Botón Info
           GestureDetector(
-            onTap: () => _showPetDetails(_getCurrentPet()),
+            onTap: () => _showUserDetails(_getCurrentUser()),
             child: Container(
               width: 50,
               height: 50,
@@ -546,7 +550,7 @@ class _PetDiscoveryScreenState extends State<PetDiscoveryScreen>
 
           // Botón Like
           GestureDetector(
-            onTap: () => _handleLike(_getCurrentPet()),
+            onTap: () => _handleLike(_getCurrentUser()),
             child: Container(
               width: 60,
               height: 60,
@@ -573,7 +577,7 @@ class _PetDiscoveryScreenState extends State<PetDiscoveryScreen>
     );
   }
 
-  Widget _buildNoMorePetsState() {
+  Widget _buildNoMoreUsersState() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -581,13 +585,13 @@ class _PetDiscoveryScreenState extends State<PetDiscoveryScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.search_off,
+              Icons.people_outline,
               size: 80,
               color: Colors.grey.shade300,
             ),
             const SizedBox(height: 24),
             Text(
-              'No hay más mascotas',
+              'No hay más usuarios',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -596,7 +600,7 @@ class _PetDiscoveryScreenState extends State<PetDiscoveryScreen>
             ),
             const SizedBox(height: 12),
             Text(
-              'Has visto todas las mascotas disponibles en tu área. ¡Vuelve más tarde!',
+              'Has visto todos los usuarios disponibles en tu área. ¡Vuelve más tarde!',
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.grey.shade500,
@@ -623,44 +627,45 @@ class _PetDiscoveryScreenState extends State<PetDiscoveryScreen>
     );
   }
 
-  PetModel _getCurrentPet() {
-    final matchProvider = Provider.of<MatchProvider>(context, listen: false);
-    return matchProvider.potentialMatches[_currentIndex];
+  UserModel _getCurrentUser() {
+    return _potentialMatches[_currentIndex];
   }
 
-  Color _getGenderColor(PetSex sex) {
-    switch (sex) {
-      case PetSex.male:
+  Color _getGenderColor(String gender) {
+    switch (gender.toLowerCase()) {
+      case 'male':
+      case 'masculino':
+      case 'hombre':
         return Colors.blue;
-      case PetSex.female:
+      case 'female':
+      case 'femenino':
+      case 'mujer':
         return Colors.pink;
       default:
-        return Colors.grey;
+        return Colors.purple;
     }
   }
 
-  void _handleLike(PetModel pet) {
+  void _handleLike(UserModel user) {
     HapticFeedback.mediumImpact();
-    _showMatchTypeDialog(pet);
+    _showUserMatchTypeDialog(user);
   }
 
-  void _handlePass(PetModel pet) {
+  void _handlePass(UserModel user) {
     HapticFeedback.lightImpact();
-    _nextPet();
+    _nextUser();
   }
 
-  void _nextPet() {
-    final matchProvider = Provider.of<MatchProvider>(context, listen: false);
-
+  void _nextUser() {
     setState(() {
       _dragOffset = Offset.zero;
-      if (_currentIndex < matchProvider.potentialMatches.length - 1) {
+      if (_currentIndex < _potentialMatches.length - 1) {
         _currentIndex++;
       }
     });
   }
 
-  void _showMatchTypeDialog(PetModel pet) {
+  void _showUserMatchTypeDialog(UserModel user) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -669,8 +674,8 @@ class _PetDiscoveryScreenState extends State<PetDiscoveryScreen>
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
+            topLeft: Radius.circular(25),
+            topRight: Radius.circular(25),
           ),
         ),
         padding: const EdgeInsets.all(24),
@@ -687,7 +692,7 @@ class _PetDiscoveryScreenState extends State<PetDiscoveryScreen>
             ),
             const SizedBox(height: 24),
             Text(
-              '¿Qué tipo de match quieres con ${pet.name}?',
+              '¿Cómo te gustaría conectar con ${user.displayName}?',
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -696,38 +701,36 @@ class _PetDiscoveryScreenState extends State<PetDiscoveryScreen>
             ),
             const SizedBox(height: 24),
 
-            _buildMatchTypeOption(
-              icon: Icons.pets,
-              title: 'Playdate',
-              description: 'Organizar una cita de juego',
-              color: Colors.orange,
-              onTap: () => _sendMatchRequest(pet, MatchType.playdate),
-            ),
-
-            if (pet.isForMating && widget.selectedPet.isForMating)
-              _buildMatchTypeOption(
-                icon: Icons.favorite,
-                title: 'Reproducción',
-                description: 'Para apareamiento',
-                color: Colors.pink,
-                onTap: () => _sendMatchRequest(pet, MatchType.mating),
-              ),
-
-            if (pet.isForAdoption)
-              _buildMatchTypeOption(
-                icon: Icons.home,
-                title: 'Adopción',
-                description: 'Interesado en adoptar',
-                color: Colors.green,
-                onTap: () => _sendMatchRequest(pet, MatchType.adoption),
-              ),
-
-            _buildMatchTypeOption(
+            _buildUserMatchTypeOption(
               icon: Icons.people,
               title: 'Amistad',
-              description: 'Conocer al dueño también',
+              description: 'Conocerse como amigos dueños de mascotas',
               color: Colors.blue,
-              onTap: () => _sendMatchRequest(pet, MatchType.friendship),
+              onTap: () => _sendUserMatchRequest(user, MatchType.petOwnerFriendship),
+            ),
+
+            _buildUserMatchTypeOption(
+              icon: Icons.pets,
+              title: 'Actividades con mascotas',
+              description: 'Organizar actividades juntos con las mascotas',
+              color: Colors.orange,
+              onTap: () => _sendUserMatchRequest(user, MatchType.petActivity),
+            ),
+
+            _buildUserMatchTypeOption(
+              icon: Icons.medical_services,
+              title: 'Cuidado de mascotas',
+              description: 'Ayudarse mutuamente con el cuidado',
+              color: Colors.green,
+              onTap: () => _sendUserMatchRequest(user, MatchType.petCare),
+            ),
+
+            _buildUserMatchTypeOption(
+              icon: Icons.coffee,
+              title: 'Encuentro social',
+              description: 'Conocerse en un ambiente social',
+              color: Colors.purple,
+              onTap: () => _sendUserMatchRequest(user, MatchType.socialMeet),
             ),
 
             const SizedBox(height: 16),
@@ -741,7 +744,7 @@ class _PetDiscoveryScreenState extends State<PetDiscoveryScreen>
     );
   }
 
-  Widget _buildMatchTypeOption({
+  Widget _buildUserMatchTypeOption({
     required IconData icon,
     required String title,
     required String description,
@@ -799,39 +802,37 @@ class _PetDiscoveryScreenState extends State<PetDiscoveryScreen>
     );
   }
 
-  Future<void> _sendMatchRequest(PetModel pet, MatchType type) async {
-    Navigator.pop(context); // Cerrar modal
+  Future<void> _sendUserMatchRequest(UserModel user, MatchType type) async {
+    Navigator.pop(context);
 
     final matchProvider = Provider.of<MatchProvider>(context, listen: false);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-    // Mostrar dialog de mensaje opcional
-    String? message = await _showMessageDialog(pet, type);
+    String? message = await _showMessageDialog(user, type);
 
-    final success = await matchProvider.sendMatchRequest(
-      fromPetId: widget.selectedPet.id,
-      toPetId: pet.id,
+    // ACTUALIZAR esta llamada agregando fromUserId:
+    final success = await matchProvider.sendUserMatchRequest(
       fromUserId: authProvider.currentUser?.id ?? '',
-      toUserId: pet.ownerId,
+      toUserId: user.id,
       type: type,
       message: message,
     );
 
     if (success) {
-      _showSuccessMessage(pet, type);
-      _nextPet();
+      _showSuccessMessage(user, type);
+      _nextUser();
     } else {
       _showErrorMessage();
     }
   }
 
-  Future<String?> _showMessageDialog(PetModel pet, MatchType type) async {
+  Future<String?> _showMessageDialog(UserModel user, MatchType type) async {
     final controller = TextEditingController();
 
     return showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Mensaje para ${pet.name}'),
+        title: Text('Mensaje para ${user.displayName}'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -863,14 +864,24 @@ class _PetDiscoveryScreenState extends State<PetDiscoveryScreen>
   }
 
   String _getMatchTypeText(MatchType type) {
-    final matchProvider = Provider.of<MatchProvider>(context, listen: false);
-    return matchProvider.getMatchTypeText(type);
+    switch (type) {
+      case MatchType.petOwnerFriendship:
+        return 'Amistad';
+      case MatchType.petActivity:
+        return 'Actividades con mascotas';
+      case MatchType.petCare:
+        return 'Cuidado de mascotas';
+      case MatchType.socialMeet:
+        return 'Encuentro social';
+      default:
+        return 'Conexión';
+    }
   }
 
-  void _showSuccessMessage(PetModel pet, MatchType type) {
+  void _showSuccessMessage(UserModel user, MatchType type) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('¡Solicitud de ${_getMatchTypeText(type).toLowerCase()} enviada a ${pet.name}!'),
+        content: Text('¡Solicitud de ${_getMatchTypeText(type).toLowerCase()} enviada a ${user.displayName}!'),
         backgroundColor: Colors.green,
         behavior: SnackBarBehavior.floating,
       ),
@@ -887,8 +898,7 @@ class _PetDiscoveryScreenState extends State<PetDiscoveryScreen>
     );
   }
 
-  void _showPetDetails(PetModel pet) {
-    // Implementar detalles completos de la mascota
+  void _showUserDetails(UserModel user) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -902,8 +912,8 @@ class _PetDiscoveryScreenState extends State<PetDiscoveryScreen>
             decoration: const BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(20),
-                topRight: Radius.circular(20),
+                topLeft: Radius.circular(25),
+                topRight: Radius.circular(25),
               ),
             ),
             child: SingleChildScrollView(
@@ -924,16 +934,111 @@ class _PetDiscoveryScreenState extends State<PetDiscoveryScreen>
                       ),
                     ),
                     const SizedBox(height: 24),
-                    Text(
-                      'Detalles de ${pet.name}',
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
+
+                    // Header con foto y nombre
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 40,
+                          backgroundImage: user.photoURL != null
+                              ? NetworkImage(user.photoURL!)
+                              : null,
+                          backgroundColor: const Color(0xFF4A7AA7).withOpacity(0.1),
+                          child: user.photoURL == null
+                              ? const Icon(Icons.person, size: 40, color: Color(0xFF4A7AA7))
+                              : null,
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      user.displayName,
+                                      style: const TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (user.isVerified) ...[
+                                    const SizedBox(width: 8),
+                                    const Icon(Icons.verified, color: Colors.blue),
+                                  ],
+                                ],
+                              ),
+                              if (user.dateOfBirth != null) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${DateTime.now().year - user.dateOfBirth!.year} años',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 16),
-                    // Aquí agregarías todos los detalles de la mascota
-                    Text('Información completa próximamente...'),
+
+                    const SizedBox(height: 24),
+
+                    // Información básica
+                    if (user.address != null) ...[
+                      _buildDetailRow(Icons.location_on, 'Ubicación', user.address!),
+                      const SizedBox(height: 12),
+                    ],
+
+                    if (user.pets.isNotEmpty) ...[
+                      _buildDetailRow(Icons.pets, 'Mascotas', '${user.pets.length} mascota${user.pets.length == 1 ? '' : 's'}'),
+                      const SizedBox(height: 12),
+                    ],
+
+                    _buildDetailRow(Icons.calendar_today, 'Miembro desde',
+                        '${user.createdAt.day}/${user.createdAt.month}/${user.createdAt.year}'),
+
+                    const SizedBox(height: 24),
+
+                    // Botones de acción
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _handlePass(user);
+                            },
+                            icon: const Icon(Icons.close),
+                            label: const Text('Pasar'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.red,
+                              side: const BorderSide(color: Colors.red),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _handleLike(user);
+                            },
+                            icon: const Icon(Icons.favorite),
+                            label: const Text('Me gusta'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -941,6 +1046,31 @@ class _PetDiscoveryScreenState extends State<PetDiscoveryScreen>
           );
         },
       ),
+    );
+  }
+
+  Widget _buildDetailRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: Colors.grey.shade600),
+        const SizedBox(width: 12),
+        Text(
+          '$label: ',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade700,
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              color: Colors.grey.shade600,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
   }
 }

@@ -17,6 +17,14 @@ class UserModel {
   final DateTime createdAt;
   final DateTime updatedAt;
   final bool isVerified;
+  final List<String> interests;           // Intereses del usuario
+  final List<String> petPreferences;     // Preferencias de mascotas
+  final AgeRange? ageRange;              // Rango de edad preferido
+  final double? maxDistance;             // Distancia máxima para matches
+  final bool isOpenToMeetPetOwners;      // Disponible para conocer dueños
+  final List<String> hobbies;            // Hobbies/actividades
+  final String? lifestyle;               // Estilo de vida (activo, relajado, etc.)
+  final List<String> languages;
 
   UserModel({
     required this.id,
@@ -35,6 +43,14 @@ class UserModel {
     required this.createdAt,
     required this.updatedAt,
     this.isVerified = false,
+    this.interests = const [],
+    this.petPreferences = const [],
+    this.ageRange,
+    this.maxDistance = 50.0,
+    this.isOpenToMeetPetOwners = false,
+    this.hobbies = const [],
+    this.lifestyle,
+    this.languages = const [],
   });
 
   // Convertir desde Firebase DocumentSnapshot
@@ -58,6 +74,14 @@ class UserModel {
       createdAt: (data['createdAt'] as Timestamp).toDate(),
       updatedAt: (data['updatedAt'] as Timestamp).toDate(),
       isVerified: data['isVerified'] ?? false,
+      interests: List<String>.from(data['interests'] ?? []),
+      petPreferences: List<String>.from(data['petPreferences'] ?? []),
+      ageRange: data['ageRange'] != null ? AgeRange.fromMap(data['ageRange']) : null,
+      maxDistance: (data['maxDistance'] ?? 50.0).toDouble(),
+      isOpenToMeetPetOwners: data['isOpenToMeetPetOwners'] ?? false,
+      hobbies: List<String>.from(data['hobbies'] ?? []),
+      lifestyle: data['lifestyle'],
+      languages: List<String>.from(data['languages'] ?? []),
     );
   }
 
@@ -79,6 +103,14 @@ class UserModel {
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
       'isVerified': isVerified,
+      'interests': interests,
+      'petPreferences': petPreferences,
+      'ageRange': ageRange?.toMap(),
+      'maxDistance': maxDistance,
+      'isOpenToMeetPetOwners': isOpenToMeetPetOwners,
+      'hobbies': hobbies,
+      'lifestyle': lifestyle,
+      'languages': languages,
     };
   }
 
@@ -115,5 +147,25 @@ class UserModel {
       updatedAt: DateTime.now(),
       isVerified: isVerified ?? this.isVerified,
     );
+  }
+}
+class AgeRange {
+  final int min;
+  final int max;
+
+  AgeRange({required this.min, required this.max});
+
+  factory AgeRange.fromMap(Map<String, dynamic> map) {
+    return AgeRange(
+      min: map['min'] ?? 18,
+      max: map['max'] ?? 99,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'min': min,
+      'max': max,
+    };
   }
 }

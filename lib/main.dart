@@ -1,10 +1,13 @@
 import 'package:apppetid/presentation/providers/auth_provider.dart';
+import 'package:apppetid/presentation/providers/chat_provider.dart';
 import 'package:apppetid/presentation/providers/match_provider.dart';
 import 'package:apppetid/presentation/providers/pet_provider.dart';
 import 'package:apppetid/presentation/providers/post_provider.dart';
 import 'package:apppetid/presentation/providers/user_provider.dart';
 import 'package:apppetid/presentation/screens/auth/register_screen.dart';
 import 'package:apppetid/presentation/screens/auth/login_screen.dart';
+import 'package:apppetid/presentation/screens/chat/chat_list_screen.dart';
+import 'package:apppetid/presentation/screens/chat/chat_screen.dart';
 import 'package:apppetid/presentation/screens/home/add_first_pet_screen.dart';
 import 'package:apppetid/presentation/screens/home/home_screen.dart';
 import 'package:apppetid/presentation/screens/pets/add_pet_screen.dart';
@@ -33,6 +36,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => PostProvider()),
         ChangeNotifierProvider(create: (_) => MatchProvider()),
         ChangeNotifierProvider(create: (_) => UserProvider()),
+        ChangeNotifierProvider(create: (_) => ChatProvider()),
       ],
       child: const MyApp(),
     ),
@@ -141,6 +145,21 @@ class MyApp extends StatelessWidget {
         '/discover': (context) => const DiscoverScreen(),
         '/create-post': (context) => const PostCreateScreen(),
         '/profile': (context) => const ProfileScreen(),
+        '/chat-list': (context) => const ChatListScreen(),
+      },
+      onGenerateRoute: (settings) {
+        if (settings.name == '/chat') {
+          final args = settings.arguments as Map<String, dynamic>?;
+          if (args != null) {
+            return MaterialPageRoute(
+              builder: (context) => ChatScreen(
+                chatId: args['chatId'] as String,
+                currentUserId: args['currentUserId'] as String,
+              ),
+            );
+          }
+        }
+        return null;
       },
     );
   }

@@ -7,12 +7,14 @@ import '../../providers/pet_provider.dart';
 import '../../providers/post_provider.dart';
 import '../../providers/match_provider.dart';
 import '../../providers/user_provider.dart';
+import '../../providers/chat_provider.dart'; // Nuevo import
 import '../pets/my_pets.dart';
 import '../social/discover_screen.dart';
 import '../social/feed_screen.dart';
 import '../social/post_create_screen.dart';
 import '../matches/match_screen.dart';
 import '../social/profile_screen.dart';
+import '../chat/chat_list_screen.dart'; // Nueva pantalla de lista de chats
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -28,11 +30,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late Animation<double> _fabAnimation;
 
   final List<Widget> _screens = [
-    const FeedScreen(),      // 0: Inicio
-    const DiscoverScreen(),  // 1: Explorar
-    const MatchScreen(),     // 2: Matches
-    const MyPetsScreen(),    // 3: Mascotas
-    const ProfileScreen(),   // 4: Perfil
+    const FeedScreen(),         // 0: Inicio
+    const DiscoverScreen(),     // 1: Explorar
+    const ChatListScreen(),     // 2: Chats (Nueva pantalla)
+    const MatchScreen(),        // 3: Matches
+    const MyPetsScreen(),       // 4: Mascotas
+    const ProfileScreen(),      // 5: Perfil
   ];
 
   @override
@@ -62,6 +65,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       final postProvider = Provider.of<PostProvider>(context, listen: false);
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       final matchProvider = Provider.of<MatchProvider>(context, listen: false);
+      final chatProvider = Provider.of<ChatProvider>(context, listen: false); // Nuevo
 
       print('🚀 HomeScreen: Inicializando providers...');
 
@@ -100,6 +104,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         // 6. Cargar usuarios sugeridos para descubrir
         await userProvider.loadSuggestedUsers();
         print('✅ Usuarios sugeridos cargados: ${userProvider.suggestedUsers.length}');
+
+        // 7. Cargar chats del usuario (NUEVO)
+        await chatProvider.loadUserChats(userId);
+        print('✅ Chats del usuario cargados: ${chatProvider.userChats.length}');
 
         print('🎉 HomeScreen: Inicialización completa');
       } else {
@@ -152,13 +160,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       case 1: // Explorar
         _loadSuggestedUsersIfNeeded();
         break;
-      case 2: // Matches
+      case 2: // Chats (NUEVO)
+        _refreshChatsIfNeeded();
+        break;
+      case 3: // Matches
         _loadMatchesIfNeeded();
         break;
-      case 3: // Mascotas
+      case 4: // Mascotas
         _refreshPetsIfNeeded();
         break;
-      case 4: // Perfil
+      case 5: // Perfil
         _loadProfileStats();
         break;
     }
@@ -188,6 +199,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     if (userProvider.suggestedUsers.isEmpty) {
       await userProvider.loadSuggestedUsers();
+    }
+  }
+
+  // NUEVO: Refrescar chats si es necesario
+  Future<void> _refreshChatsIfNeeded() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+
+    if (authProvider.currentUser != null && chatProvider.userChats.isEmpty) {
+      await chatProvider.refreshChats(authProvider.currentUser!.id);
     }
   }
 
@@ -238,9 +259,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             children: [
               _buildNavItem(0, Icons.home, 'Inicio'),
               _buildNavItem(1, Icons.explore, 'Explorar'),
-              _buildNavItem(2, Icons.favorite, 'Matches'),
-              _buildNavItem(3, Icons.pets, 'Mascotas'),
-              _buildNavItem(4, Icons.person, 'Perfil'),
+              _buildNavItem(2, Icons.chat_bubble, 'Chats'), // NUEVO
+              _buildNavItem(3, Icons.favorite, 'Matches'),
+              _buildNavItem(4, Icons.pets, 'Mascotas'),
+              _buildNavItem(5, Icons.person, 'Perfil'),
             ],
           ),
         ),
@@ -251,7 +273,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _buildNavItem(int index, IconData icon, String label) {
     final isSelected = _currentIndex == index;
 
-    // Agregar badge para matches si hay solicitudes pendientes
+    // Agregar badge para chats con mensajes no leídos
     Widget iconWidget = Icon(
       icon,
       color: isSelected
@@ -260,7 +282,51 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       size: 24,
     );
 
-    if (index == 2) { // Matches tab
+    if (index == 2) { // Chats tab
+      iconWidget = Consumer<ChatProvider>(
+        builder: (context, chatProvider, child) {
+          final unreadCount = chatProvider.totalUnreadCount;
+
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Icon(
+                icon,
+                color: isSelected
+                    ? const Color(0xFF4A7AA7)
+                    : Colors.grey.shade400,
+                size: 24,
+              ),
+              if (unreadCount > 0)
+                Positioned(
+                  right: -6,
+                  top: -4,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      unreadCount > 99 ? '99+' : '$unreadCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+      );
+    } else if (index == 3) { // Matches tab
       iconWidget = Consumer<MatchProvider>(
         builder: (context, matchProvider, child) {
           final hasPendingRequests = matchProvider.pendingMatches.isNotEmpty;

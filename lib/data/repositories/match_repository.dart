@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import '../models/pet_model.dart';
 import '../models/match_model.dart';
+import '../models/user_model.dart';
 import '../services/firebase_service.dart';
 
 class MatchRepository {
@@ -52,42 +53,44 @@ class MatchRepository {
 
   // Crear solicitud de match
   Future<String> createMatchRequest({
-    required String fromPetId,
-    required String toPetId,
+    String? fromPetId,
+    String? toPetId,
+    required String fromUserId,
+    required String toUserId,
     required MatchType type,
     String? message,
   }) async {
     try {
       final matchId = _uuid.v4();
 
-      // Obtener información de las mascotas
-      final fromPetDoc = await FirebaseService.pets.doc(fromPetId).get();
-      final toPetDoc = await FirebaseService.pets.doc(toPetId).get();
+      MatchModel match;
 
-      if (!fromPetDoc.exists || !toPetDoc.exists) {
-        throw Exception('Una de las mascotas no existe');
+      if (fromPetId != null && toPetId != null) {
+        // Match de mascotas
+        match = MatchModel.createPetMatch(
+          id: matchId,
+          fromUserId: fromUserId,
+          toUserId: toUserId,
+          fromPetId: fromPetId,
+          toPetId: toPetId,
+          type: type,
+          message: message,
+        );
+      } else {
+        // Match de usuarios
+        match = MatchModel.createUserMatch(
+          id: matchId,
+          fromUserId: fromUserId,
+          toUserId: toUserId,
+          type: type,
+          message: message,
+        );
       }
-
-      final fromPet = PetModel.fromFirestore(fromPetDoc);
-      final toPet = PetModel.fromFirestore(toPetDoc);
-
-      final match = MatchModel(
-        id: matchId,
-        fromPetId: fromPetId,
-        toPetId: toPetId,
-        fromUserId: fromPet.ownerId,
-        toUserId: toPet.ownerId,
-        type: type,
-        status: MatchStatus.pending,
-        message: message,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
 
       await FirebaseService.matches.doc(matchId).set(match.toFirestore());
       return matchId;
     } catch (e) {
-      throw Exception('Error creando solicitud de match: $e');
+      throw Exception('Error creando match: $e');
     }
   }
 
@@ -172,6 +175,42 @@ class MatchRepository {
       });
     } catch (e) {
       throw Exception('Error reportando match: $e');
+    }
+  }
+  Future<String> createUserMatchRequest(MatchModel match) async {
+    try {
+      await FirebaseService.matches.doc(match.id).set(match.toFirestore());
+      return match.id;
+    } catch (e) {
+      throw Exception('Error creando match de usuario: $e');
+    }
+  }
+
+// Buscar usuarios potenciales para match
+  Future<List<UserModel>> findPotentialUserMatches({
+    required String currentUserId,
+    int? minAge,
+    int? maxAge,
+    double? maxDistance,
+    List<String>? interests,
+  }) async {
+    try {
+      Query query = FirebaseService.users
+          .where('id', isNotEqualTo: currentUserId)
+          .where('isOpenToMeetPetOwners', isEqualTo: true);
+
+      // Filtros adicionales basados en preferencias
+      if (interests != null && interests.isNotEmpty) {
+        query = query.where('interests', arrayContainsAny: interests);
+      }
+
+      final snapshot = await query.limit(50).get();
+
+      return snapshot.docs
+          .map((doc) => UserModel.fromFirestore(doc))
+          .toList();
+    } catch (e) {
+      throw Exception('Error buscando usuarios para match: $e');
     }
   }
 }

@@ -1,3 +1,4 @@
+import 'package:apppetid/presentation/screens/matches/user_discovery_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -25,7 +26,7 @@ class _MatchScreenState extends State<MatchScreen> with TickerProviderStateMixin
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
@@ -72,9 +73,10 @@ class _MatchScreenState extends State<MatchScreen> with TickerProviderStateMixin
           body: TabBarView(
             controller: _tabController,
             children: [
-              _buildDiscoveryTab(),
-              _buildMatchesTab(),
-              _buildRequestsTab(),
+              _buildPetDiscoveryTab(),      // 0: Mascotas
+              _buildUserDiscoveryTab(),     // 1: Usuarios (NUEVO)
+              _buildMatchesTab(),           // 2: Matches
+              _buildRequestsTab(),          // 3: Solicitudes
             ],
           ),
         ),
@@ -141,7 +143,8 @@ class _MatchScreenState extends State<MatchScreen> with TickerProviderStateMixin
           indicatorWeight: 3,
           labelStyle: const TextStyle(fontWeight: FontWeight.w600),
           tabs: const [
-            Tab(text: 'Descubrir'),
+            Tab(text: 'Mascotas'),
+            Tab(text: 'Usuarios'),
             Tab(text: 'Matches'),
             Tab(text: 'Solicitudes'),
           ],
@@ -151,7 +154,7 @@ class _MatchScreenState extends State<MatchScreen> with TickerProviderStateMixin
     );
   }
 
-  Widget _buildDiscoveryTab() {
+  Widget _buildPetDiscoveryTab() {
     return Consumer<PetProvider>(
       builder: (context, petProvider, child) {
         if (petProvider.userPets.isEmpty) {
@@ -279,7 +282,9 @@ class _MatchScreenState extends State<MatchScreen> with TickerProviderStateMixin
       },
     );
   }
-
+  Widget _buildUserDiscoveryTab() {
+    return const UserDiscoveryScreen();
+  }
   Widget _buildMatchCard(MatchModel match) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -350,29 +355,33 @@ class _MatchScreenState extends State<MatchScreen> with TickerProviderStateMixin
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              // Mascota 1
-              _buildPetInfo(match.fromPetId, isOwner: true),
-              const SizedBox(width: 16),
-              // Icono de corazón
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: const BoxDecoration(
-                  color: Colors.pink,
-                  shape: BoxShape.circle,
+          if (match.isPetMatch) ...[
+            // UI para matches de mascotas (código existente)
+            Row(
+              children: [
+                _buildPetInfo(match.fromPetId!, isOwner: true),
+                const SizedBox(width: 16),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(
+                    color: Colors.pink,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.favorite,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                 ),
-                child: const Icon(
-                  Icons.favorite,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 16),
-              // Mascota 2
-              _buildPetInfo(match.toPetId, isOwner: false),
-            ],
-          ),
+                const SizedBox(width: 16),
+                _buildPetInfo(match.toPetId!, isOwner: false),
+              ],
+            ),
+          ] else if (match.isUserMatch) ...[
+            // NUEVA UI para matches de usuarios
+            _buildUserMatchInfo(match),
+          ],
+
           if (match.message != null) ...[
             const SizedBox(height: 16),
             Container(
@@ -405,6 +414,97 @@ class _MatchScreenState extends State<MatchScreen> with TickerProviderStateMixin
         ],
       ),
     );
+  }
+  Widget _buildUserMatchInfo(MatchModel match) {
+    return Consumer<UserProvider>(
+      builder: (context, userProvider, child) {
+        final fromUser = userProvider.getUserForPost(match.fromUserId);
+        final toUser = userProvider.getUserForPost(match.toUserId);
+
+        return Row(
+          children: [
+            Expanded(child: _buildUserInfoCard(fromUser, 'Solicitante')),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: _getMatchTypeColor(match.type),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                _getMatchTypeIcon(match.type),
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+            Expanded(child: _buildUserInfoCard(toUser, 'Destinatario')),
+          ],
+        );
+      },
+    );
+  }
+  Widget _buildUserInfoCard(dynamic user, String label) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          CircleAvatar(
+            radius: 30,
+            backgroundImage: user?.photoURL != null
+                ? NetworkImage(user!.photoURL!)
+                : null,
+            backgroundColor: const Color(0xFF4A7AA7).withOpacity(0.1),
+            child: user?.photoURL == null
+                ? const Icon(Icons.person, color: Color(0xFF4A7AA7))
+                : null,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            user?.displayName ?? 'Usuario',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+          ),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade600,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _getMatchTypeIcon(MatchType type) {
+    switch (type) {
+      case MatchType.mating:
+        return Icons.favorite;
+      case MatchType.playdate:
+        return Icons.sports_tennis;
+      case MatchType.adoption:
+        return Icons.home;
+      case MatchType.friendship:
+        return Icons.people;
+    // NUEVOS ICONOS PARA USUARIOS:
+      case MatchType.petOwnerFriendship:
+        return Icons.people;
+      case MatchType.petActivity:
+        return Icons.pets;
+      case MatchType.petCare:
+        return Icons.medical_services;
+      case MatchType.socialMeet:
+        return Icons.coffee;
+    }
   }
 
   Widget _buildPetInfo(String petId, {required bool isOwner}) {
@@ -585,29 +685,13 @@ class _MatchScreenState extends State<MatchScreen> with TickerProviderStateMixin
   }
 
   Color _getMatchTypeColor(MatchType type) {
-    switch (type) {
-      case MatchType.mating:
-        return Colors.pink;
-      case MatchType.playdate:
-        return Colors.orange;
-      case MatchType.adoption:
-        return Colors.green;
-      case MatchType.friendship:
-        return Colors.blue;
-    }
+    final matchProvider = Provider.of<MatchProvider>(context, listen: false);
+    return matchProvider.getMatchTypeColor(type);
   }
 
   String _getMatchTypeText(MatchType type) {
-    switch (type) {
-      case MatchType.mating:
-        return 'Reproducción';
-      case MatchType.playdate:
-        return 'Juego';
-      case MatchType.adoption:
-        return 'Adopción';
-      case MatchType.friendship:
-        return 'Amistad';
-    }
+    final matchProvider = Provider.of<MatchProvider>(context, listen: false);
+    return matchProvider.getMatchTypeText(type);
   }
 
   String _formatMatchDate(DateTime date) {

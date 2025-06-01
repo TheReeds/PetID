@@ -66,7 +66,7 @@ class _MatchRequestsScreenState extends State<MatchRequestsScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              'Las solicitudes de match aparecerán aquí cuando otros usuarios estén interesados en tus mascotas',
+              'Las solicitudes aparecerán aquí cuando otros usuarios estén interesados en conectar contigo o con tus mascotas',
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.grey.shade500,
@@ -82,24 +82,58 @@ class _MatchRequestsScreenState extends State<MatchRequestsScreen> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.blue.shade200),
               ),
-              child: Row(
+              child: Column(
                 children: [
-                  Icon(Icons.lightbulb_outline, color: Colors.blue.shade600),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Para recibir más solicitudes, asegúrate de que tus mascotas estén marcadas como disponibles para playdate o adopción',
-                      style: TextStyle(
-                        color: Colors.blue.shade800,
-                        fontSize: 14,
+                  Row(
+                    children: [
+                      Icon(Icons.lightbulb_outline, color: Colors.blue.shade600),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Consejos para recibir más solicitudes:',
+                          style: TextStyle(
+                            color: Colors.blue.shade800,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildTipRow(Icons.pets, 'Marca tus mascotas como disponibles para playdate'),
+                      _buildTipRow(Icons.people, 'Mantén tu perfil actualizado y completo'),
+                      _buildTipRow(Icons.explore, 'Explora usuarios y mascotas en la pestaña de descubrimiento'),
+                    ],
                   ),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+  Widget _buildTipRow(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: Colors.blue.shade600),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: Colors.blue.shade700,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -337,65 +371,146 @@ class _MatchRequestsScreenState extends State<MatchRequestsScreen> {
 
           const SizedBox(height: 20),
 
-          // Información de las mascotas con diseño mejorado
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade50,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.pets, color: Colors.grey.shade700, size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Mascotas involucradas',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey.shade700,
+          // CONDICIÓN: Mostrar mascotas solo si es match de mascotas
+          if (match.isPetMatch) ...[
+            // Información de las mascotas con diseño mejorado
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.pets, color: Colors.grey.shade700, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Mascotas involucradas',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade700,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(child: _buildPetInfoCard(match.fromPetId, 'Su mascota', true)),
-                    Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 12),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            _getMatchTypeColor(match.type),
-                            _getMatchTypeColor(match.type).withOpacity(0.8),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(child: _buildPetInfoCard(match.fromPetId!, 'Su mascota', true)),
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 12),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              _getMatchTypeColor(match.type),
+                              _getMatchTypeColor(match.type).withOpacity(0.8),
+                            ],
+                          ),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: _getMatchTypeColor(match.type).withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
                           ],
                         ),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: _getMatchTypeColor(match.type).withOpacity(0.3),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
+                        child: Icon(
+                          _getMatchTypeIcon(match.type),
+                          color: Colors.white,
+                          size: 24,
+                        ),
                       ),
-                      child: Icon(
-                        _getMatchTypeIcon(match.type),
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                    ),
-                    Expanded(child: _buildPetInfoCard(match.toPetId, 'Tu mascota', false)),
-                  ],
-                ),
-              ],
+                      Expanded(child: _buildPetInfoCard(match.toPetId!, 'Tu mascota', false)),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
+          ] else if (match.isUserMatch) ...[
+            // NUEVO: Información específica para matches de usuarios
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.purple.shade50,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.purple.shade200),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.people, color: Colors.purple.shade700, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Solicitud de conexión entre usuarios',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.purple.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Información específica del tipo de match de usuario
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.purple.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: _getMatchTypeColor(match.type).withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            _getMatchTypeIcon(match.type),
+                            color: _getMatchTypeColor(match.type),
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _getMatchTypeText(match.type),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _getMatchTypeDescription(match.type),
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
 
           // Mensaje si existe
           if (match.message != null && match.message!.isNotEmpty) ...[
@@ -466,7 +581,36 @@ class _MatchRequestsScreenState extends State<MatchRequestsScreen> {
     );
   }
 
-  Widget _buildPetInfoCard(String petId, String label, bool isRequester) {
+  Widget _buildPetInfoCard(String? petId, String label, bool isRequester) {
+    // AGREGAR verificación de null
+    if (petId == null) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              Icons.help_outline,
+              size: 32,
+              color: Colors.grey.shade500,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Sin mascota',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Consumer<PetProvider>(
       builder: (context, petProvider, child) {
         // En una implementación real, obtendrías la mascota por ID desde el provider
@@ -559,6 +703,7 @@ class _MatchRequestsScreenState extends State<MatchRequestsScreen> {
     );
   }
 
+
   Widget _buildPetDetailRow(IconData icon, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
@@ -579,6 +724,27 @@ class _MatchRequestsScreenState extends State<MatchRequestsScreen> {
         ],
       ),
     );
+  }
+
+  String _getMatchTypeDescription(MatchType type) {
+    switch (type) {
+      case MatchType.mating:
+        return 'Para apareamiento entre mascotas';
+      case MatchType.playdate:
+        return 'Organizar una cita de juego para mascotas';
+      case MatchType.adoption:
+        return 'Interés en adopción';
+      case MatchType.friendship:
+        return 'Amistad entre mascotas';
+      case MatchType.petOwnerFriendship:
+        return 'Conocerse como amigos dueños de mascotas';
+      case MatchType.petActivity:
+        return 'Organizar actividades juntos con las mascotas';
+      case MatchType.petCare:
+        return 'Ayudarse mutuamente con el cuidado de mascotas';
+      case MatchType.socialMeet:
+        return 'Conocerse en un ambiente social casual';
+    }
   }
 
   Widget _buildRequestActions(MatchModel match) {
@@ -670,6 +836,15 @@ class _MatchRequestsScreenState extends State<MatchRequestsScreen> {
         return Colors.green.shade400;
       case MatchType.friendship:
         return Colors.blue.shade400;
+    // NUEVOS TIPOS:
+      case MatchType.petOwnerFriendship:
+        return Colors.blue.shade400;
+      case MatchType.petActivity:
+        return Colors.orange.shade400;
+      case MatchType.petCare:
+        return Colors.green.shade400;
+      case MatchType.socialMeet:
+        return Colors.purple.shade400;
     }
   }
 
@@ -683,6 +858,15 @@ class _MatchRequestsScreenState extends State<MatchRequestsScreen> {
         return Icons.home_filled;
       case MatchType.friendship:
         return Icons.people;
+    // NUEVOS ICONOS:
+      case MatchType.petOwnerFriendship:
+        return Icons.people;
+      case MatchType.petActivity:
+        return Icons.pets;
+      case MatchType.petCare:
+        return Icons.medical_services;
+      case MatchType.socialMeet:
+        return Icons.coffee;
     }
   }
 
@@ -696,6 +880,14 @@ class _MatchRequestsScreenState extends State<MatchRequestsScreen> {
         return 'Adopción';
       case MatchType.friendship:
         return 'Amistad';
+      case MatchType.petOwnerFriendship:
+        return 'Amistad';
+      case MatchType.petActivity:
+        return 'Actividades';
+      case MatchType.petCare:
+        return 'Cuidado';
+      case MatchType.socialMeet:
+        return 'Encuentro';
     }
   }
 

@@ -1,10 +1,14 @@
+// lib/presentation/screens/social/feed_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../../../data/models/user_model.dart';
 import '../../providers/post_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/user_provider.dart';
+import '../../providers/chat_provider.dart'; // Nuevo import
 import '../../../data/models/post_model.dart';
+import '../chat/chat_screen.dart'; // Nuevo import
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
@@ -159,99 +163,9 @@ class _FeedScreenState extends State<FeedScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildErrorCard(String error) {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.red.shade50,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.red.shade200),
-      ),
-      child: Column(
-        children: [
-          Icon(Icons.error_outline, size: 48, color: Colors.red.shade400),
-          const SizedBox(height: 16),
-          Text(
-            'Error al cargar publicaciones',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.red.shade700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            error,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.red.shade600,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: _loadInitialData,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red.shade600,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Reintentar'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.pets, size: 80, color: Colors.grey.shade300),
-          const SizedBox(height: 16),
-          Text(
-            '¡Bienvenido a PetID!',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey.shade600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Sé el primero en compartir algo con la comunidad',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey.shade500,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: () {
-              // Navegar a crear post
-              Navigator.of(context).pushNamed('/create-post');
-            },
-            icon: const Icon(Icons.add),
-            label: const Text('Crear primera publicación'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF4A7AA7),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(25),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildAppBar() {
-    return Consumer<AuthProvider>(
-      builder: (context, authProvider, child) {
+    return Consumer2<AuthProvider, ChatProvider>(
+      builder: (context, authProvider, chatProvider, child) {
         return SliverAppBar(
           floating: true,
           backgroundColor: Colors.white,
@@ -271,9 +185,42 @@ class _FeedScreenState extends State<FeedScreen> with TickerProviderStateMixin {
                 icon: const Icon(Icons.notifications_outlined, color: Color(0xFF4A7AA7)),
                 onPressed: () => _showNotifications(),
               ),
-              IconButton(
-                icon: const Icon(Icons.chat_bubble_outline, color: Color(0xFF4A7AA7)),
-                onPressed: () => _showMessages(),
+              // NUEVO: Botón de mensajes con badge
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.chat_bubble_outline, color: Color(0xFF4A7AA7)),
+                    onPressed: () => _showMessages(),
+                  ),
+                  if (chatProvider.totalUnreadCount > 0)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          chatProvider.totalUnreadCount > 99
+                              ? '99+'
+                              : '${chatProvider.totalUnreadCount}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ],
           ),
@@ -498,105 +445,111 @@ class _FeedScreenState extends State<FeedScreen> with TickerProviderStateMixin {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              // Avatar del usuario
-              CircleAvatar(
-                radius: 20,
-                backgroundImage: user?.photoURL != null
-                    ? NetworkImage(user!.photoURL!)
-                    : null,
-                backgroundColor: const Color(0xFF4A7AA7).withOpacity(0.1),
-                child: user?.photoURL == null
-                    ? Text(
-                  user?.displayName.isNotEmpty == true
-                      ? user!.displayName.substring(0, 1).toUpperCase()
-                      : post.authorId.substring(0, 1).toUpperCase(),
-                  style: const TextStyle(
-                    color: Color(0xFF4A7AA7),
-                    fontWeight: FontWeight.bold,
-                  ),
-                )
-                    : null,
+              // Avatar del usuario - NUEVO: Clickeable para enviar mensaje
+              GestureDetector(
+                onTap: () => _showUserProfile(post.authorId, user),
+                child: CircleAvatar(
+                  radius: 20,
+                  backgroundImage: user?.photoURL != null
+                      ? NetworkImage(user!.photoURL!)
+                      : null,
+                  backgroundColor: const Color(0xFF4A7AA7).withOpacity(0.1),
+                  child: user?.photoURL == null
+                      ? Text(
+                    user?.displayName.isNotEmpty == true
+                        ? user!.displayName.substring(0, 1).toUpperCase()
+                        : post.authorId.substring(0, 1).toUpperCase(),
+                    style: const TextStyle(
+                      color: Color(0xFF4A7AA7),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  )
+                      : null,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            user?.displayName ?? user?.fullName ?? 'Usuario ${post.authorId.substring(0, 8)}',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
+                child: GestureDetector(
+                  onTap: () => _showUserProfile(post.authorId, user),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              user?.displayName ?? user?.fullName ?? 'Usuario ${post.authorId.substring(0, 8)}',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                        if (user?.isVerified == true) ...[
-                          const SizedBox(width: 4),
-                          const Icon(
-                            Icons.verified,
-                            size: 16,
-                            color: Color(0xFF4A7AA7),
-                          ),
+                          if (user?.isVerified == true) ...[
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.verified,
+                              size: 16,
+                              color: Color(0xFF4A7AA7),
+                            ),
+                          ],
                         ],
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        Text(
-                          _formatTime(post.createdAt),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                        if (post.petId != null) ...[
+                      ),
+                      Row(
+                        children: [
                           Text(
-                            ' • ',
-                            style: TextStyle(color: Colors.grey.shade600),
-                          ),
-                          Icon(
-                            Icons.pets,
-                            size: 12,
-                            color: Colors.grey.shade600,
-                          ),
-                          const SizedBox(width: 2),
-                          Text(
-                            'con mascota',
+                            _formatTime(post.createdAt),
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey.shade600,
                             ),
                           ),
-                        ],
-                        if (post.location != null) ...[
-                          Text(
-                            ' • ',
-                            style: TextStyle(color: Colors.grey.shade600),
-                          ),
-                          Icon(
-                            Icons.location_on,
-                            size: 12,
-                            color: Colors.grey.shade600,
-                          ),
-                          if (post.locationName != null)
-                            Flexible(
-                              child: Text(
-                                post.locationName!,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade600,
-                                ),
-                                overflow: TextOverflow.ellipsis,
+                          if (post.petId != null) ...[
+                            Text(
+                              ' • ',
+                              style: TextStyle(color: Colors.grey.shade600),
+                            ),
+                            Icon(
+                              Icons.pets,
+                              size: 12,
+                              color: Colors.grey.shade600,
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              'con mascota',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
                               ),
                             ),
+                          ],
+                          if (post.location != null) ...[
+                            Text(
+                              ' • ',
+                              style: TextStyle(color: Colors.grey.shade600),
+                            ),
+                            Icon(
+                              Icons.location_on,
+                              size: 12,
+                              color: Colors.grey.shade600,
+                            ),
+                            if (post.locationName != null)
+                              Flexible(
+                                child: Text(
+                                  post.locationName!,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                          ],
                         ],
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
               if (post.type == PostType.announcement)
@@ -623,6 +576,207 @@ class _FeedScreenState extends State<FeedScreen> with TickerProviderStateMixin {
           ),
         );
       },
+    );
+  }
+
+  // NUEVO: Metodo para mostrar perfil de usuario con opción de mensaje
+  void _showUserProfile(String authorId, UserModel? user) {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final currentUserId = authProvider.currentUser?.id ?? '';
+
+    // No mostrar opciones si es el mismo usuario
+    if (authorId == currentUserId) return;
+
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 25,
+                    backgroundImage: user?.photoURL != null
+                        ? NetworkImage(user!.photoURL!)
+                        : null,
+                    backgroundColor: const Color(0xFF4A7AA7).withOpacity(0.1),
+                    child: user?.photoURL == null
+                        ? Text(
+                      user?.displayName.isNotEmpty == true
+                          ? user!.displayName.substring(0, 1).toUpperCase()
+                          : authorId.substring(0, 1).toUpperCase(),
+                      style: const TextStyle(
+                        color: Color(0xFF4A7AA7),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    )
+                        : null,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                user?.displayName ?? user?.fullName ?? 'Usuario',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (user?.isVerified == true) ...[
+                              const SizedBox(width: 4),
+                              const Icon(
+                                Icons.verified,
+                                size: 16,
+                                color: Color(0xFF4A7AA7),
+                              ),
+                            ],
+                          ],
+                        ),
+                        if (user?.fullName != null && user!.fullName != user.displayName)
+                          Text(
+                            user.fullName!,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.chat_bubble_outline, color: Color(0xFF4A7AA7)),
+              title: const Text('Enviar mensaje'),
+              onTap: () {
+                Navigator.pop(context);
+                _sendMessageToUser(authorId, user);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.person, color: Color(0xFF4A7AA7)),
+              title: const Text('Ver perfil'),
+              onTap: () {
+                Navigator.pop(context);
+                _viewUserProfile(authorId);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.report, color: Colors.red),
+              title: const Text('Reportar usuario'),
+              onTap: () {
+                Navigator.pop(context);
+                _reportUser(authorId);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // NUEVO: Metodo para enviar mensaje a usuario
+  Future<void> _sendMessageToUser(String toUserId, UserModel? toUser) async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+
+    if (authProvider.currentUser == null) return;
+
+    final currentUserId = authProvider.currentUser!.id;
+
+    try {
+      // Mostrar loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(color: Color(0xFF4A7AA7)),
+        ),
+      );
+
+      // Buscar chat existente o crear uno nuevo
+      final existingChat = await chatProvider.findExistingChatBetweenUsers(
+        [currentUserId, toUserId],
+      );
+
+      String chatId;
+      if (existingChat != null) {
+        chatId = existingChat.id;
+      } else {
+        final newChatId = await chatProvider.createDirectChat(
+          fromUserId: currentUserId,
+          toUserId: toUserId,
+          initialMessage: '¡Hola! Vi tu publicación y me interesa conocer más.',
+        );
+
+        if (newChatId == null) {
+          Navigator.pop(context); // Cerrar loading
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Error al crear la conversación')),
+          );
+          return;
+        }
+        chatId = newChatId;
+      }
+
+      Navigator.pop(context); // Cerrar loading
+
+      // Navegar al chat usando argumentos
+      Navigator.of(context).pushNamed(
+        '/chat',
+        arguments: {
+          'chatId': chatId,
+          'currentUserId': currentUserId,
+        },
+      );
+
+    } catch (e) {
+      Navigator.pop(context); // Cerrar loading
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
+  }
+
+  void _viewUserProfile(String userId) {
+    // Navegar al perfil del usuario
+    Navigator.of(context).pushNamed('/profile', arguments: userId);
+  }
+
+  void _reportUser(String userId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reportar usuario'),
+        content: const Text('¿Por qué quieres reportar a este usuario?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Reporte enviado exitosamente')),
+              );
+            },
+            child: const Text('Reportar'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -756,6 +910,7 @@ class _FeedScreenState extends State<FeedScreen> with TickerProviderStateMixin {
       builder: (context, authProvider, child) {
         final currentUserId = authProvider.currentUser?.id ?? '';
         final isLiked = post.isLikedBy(currentUserId);
+        final isOwnPost = currentUserId == post.authorId;
 
         return Padding(
           padding: const EdgeInsets.all(16),
@@ -797,6 +952,14 @@ class _FeedScreenState extends State<FeedScreen> with TickerProviderStateMixin {
                 onTap: () => _sharePost(post),
                 child: Icon(Icons.share_outlined, color: Colors.grey.shade600, size: 20),
               ),
+              // NUEVO: Botón de mensaje directo si no es post propio
+              if (!isOwnPost) ...[
+                const SizedBox(width: 24),
+                GestureDetector(
+                  onTap: () => _sendMessageFromPost(post),
+                  child: Icon(Icons.send_outlined, color: Colors.grey.shade600, size: 20),
+                ),
+              ],
               const Spacer(),
               GestureDetector(
                 onTap: () => _savePost(post),
@@ -807,6 +970,17 @@ class _FeedScreenState extends State<FeedScreen> with TickerProviderStateMixin {
         );
       },
     );
+  }
+
+  // NUEVO: Método para enviar mensaje desde post
+  Future<void> _sendMessageFromPost(PostModel post) async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+
+    if (authProvider.currentUser == null) return;
+
+    final user = userProvider.getUserForPost(post.authorId);
+    await _sendMessageToUser(post.authorId, user);
   }
 
   Widget _buildLoadMoreIndicator(PostProvider postProvider) {
@@ -861,6 +1035,96 @@ class _FeedScreenState extends State<FeedScreen> with TickerProviderStateMixin {
     return const SizedBox.shrink();
   }
 
+  Widget _buildErrorCard(String error) {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.red.shade200),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.error_outline, size: 48, color: Colors.red.shade400),
+          const SizedBox(height: 16),
+          Text(
+            'Error al cargar publicaciones',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.red.shade700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            error,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.red.shade600,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _loadInitialData,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade600,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Reintentar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.pets, size: 80, color: Colors.grey.shade300),
+          const SizedBox(height: 16),
+          Text(
+            '¡Bienvenido a PetID!',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Sé el primero en compartir algo con la comunidad',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey.shade500,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: () {
+              // Navegar a crear post
+              Navigator.of(context).pushNamed('/create-post');
+            },
+            icon: const Icon(Icons.add),
+            label: const Text('Crear primera publicación'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4A7AA7),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(25),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   String _formatTime(DateTime dateTime) {
     final now = DateTime.now();
     final difference = now.difference(dateTime);
@@ -891,10 +1155,10 @@ class _FeedScreenState extends State<FeedScreen> with TickerProviderStateMixin {
     );
   }
 
+  // MODIFICADO: Navegar a la pestaña de chats
   void _showMessages() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Mensajes próximamente')),
-    );
+    // Navegar directamente a la lista de chats
+    Navigator.of(context).pushNamed('/chat-list');
   }
 
   void _viewLostPets() {
@@ -978,6 +1242,15 @@ class _FeedScreenState extends State<FeedScreen> with TickerProviderStateMixin {
                 },
               ),
             ] else ...[
+              // NUEVO: Opción de enviar mensaje al autor
+              ListTile(
+                leading: const Icon(Icons.chat_bubble_outline, color: Color(0xFF4A7AA7)),
+                title: const Text('Enviar mensaje'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _sendMessageFromPost(post);
+                },
+              ),
               ListTile(
                 leading: const Icon(Icons.report),
                 title: const Text('Reportar'),
