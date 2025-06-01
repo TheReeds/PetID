@@ -21,7 +21,7 @@ class MatchRepository {
     Query query = FirebaseService.pets
         .where('type', isEqualTo: type.toString().split('.').last)
         .where('size', isEqualTo: size.toString().split('.').last)
-        .where('id', isNotEqualTo: petId); // Excluir la propia mascota
+        .where('id', isNotEqualTo: petId);
 
     // Filtros adicionales
     if (forMating) {

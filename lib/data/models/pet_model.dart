@@ -33,6 +33,9 @@ class PetModel {
   final ContactInfo? emergencyContact;
   final DateTime createdAt;
   final DateTime updatedAt;
+  GeoPoint? get location => lastKnownLocation != null
+      ? GeoPoint(lastKnownLocation!.latitude, lastKnownLocation!.longitude)
+      : null;
 
   PetModel({
     required this.id,

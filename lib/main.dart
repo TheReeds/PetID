@@ -2,6 +2,7 @@ import 'package:apppetid/presentation/providers/auth_provider.dart';
 import 'package:apppetid/presentation/providers/match_provider.dart';
 import 'package:apppetid/presentation/providers/pet_provider.dart';
 import 'package:apppetid/presentation/providers/post_provider.dart';
+import 'package:apppetid/presentation/providers/user_provider.dart';
 import 'package:apppetid/presentation/screens/auth/register_screen.dart';
 import 'package:apppetid/presentation/screens/auth/login_screen.dart';
 import 'package:apppetid/presentation/screens/home/add_first_pet_screen.dart';
@@ -31,6 +32,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => PetProvider()),
         ChangeNotifierProvider(create: (_) => PostProvider()),
         ChangeNotifierProvider(create: (_) => MatchProvider()),
+        ChangeNotifierProvider(create: (_) => UserProvider()),
       ],
       child: const MyApp(),
     ),

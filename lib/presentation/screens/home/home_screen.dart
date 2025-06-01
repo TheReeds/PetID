@@ -4,10 +4,14 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/pet_provider.dart';
+import '../../providers/post_provider.dart';
+import '../../providers/match_provider.dart';
+import '../../providers/user_provider.dart';
 import '../pets/my_pets.dart';
 import '../social/discover_screen.dart';
 import '../social/feed_screen.dart';
 import '../social/post_create_screen.dart';
+import '../matches/match_screen.dart';
 import '../social/profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -24,11 +28,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late Animation<double> _fabAnimation;
 
   final List<Widget> _screens = [
-    const FeedScreen(),
-    const DiscoverScreen(),
-    const SizedBox.shrink(), // Placeholder para el FAB
-    const MyPetsScreen(),
-    const ProfileScreen(),
+    const FeedScreen(),      // 0: Inicio
+    const DiscoverScreen(),  // 1: Explorar
+    const MatchScreen(),     // 2: Matches
+    const MyPetsScreen(),    // 3: Mascotas
+    const ProfileScreen(),   // 4: Perfil
   ];
 
   @override
@@ -46,13 +50,64 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     // Cargar datos iniciales
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeProviders();
+    });
+  }
+
+  // Inicializar todos los providers necesarios
+  Future<void> _initializeProviders() async {
+    try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final petProvider = Provider.of<PetProvider>(context, listen: false);
+      final postProvider = Provider.of<PostProvider>(context, listen: false);
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final matchProvider = Provider.of<MatchProvider>(context, listen: false);
 
+      print('🚀 HomeScreen: Inicializando providers...');
+
+      // Verificar que hay un usuario autenticado
       if (authProvider.currentUser != null) {
-        petProvider.loadUserPets(authProvider.currentUser!.id);
+        final userId = authProvider.currentUser!.id;
+        print('✅ Usuario autenticado: $userId');
+
+        // 1. Cargar información del usuario actual en cache
+        await userProvider.getUserById(userId);
+        print('✅ Usuario actual cargado en cache');
+
+        // 2. Cargar mascotas del usuario
+        petProvider.loadUserPets(userId);
+        print('✅ Cargando mascotas del usuario...');
+
+        // 3. Cargar feed de posts
+        await postProvider.loadFeedPosts(refresh: true);
+        print('✅ Posts del feed cargados: ${postProvider.feedPosts.length}');
+
+        // 4. Precargar información de usuarios de los posts
+        final authorIds = postProvider.feedPosts
+            .map((post) => post.authorId)
+            .toSet()
+            .toList();
+
+        if (authorIds.isNotEmpty) {
+          await userProvider.preloadUsersForFeed(authorIds);
+          print('✅ Información de ${authorIds.length} autores cargada');
+        }
+
+        // 5. Cargar matches del usuario
+        await matchProvider.loadUserMatches(userId);
+        print('✅ Matches del usuario cargados: ${matchProvider.userMatches.length}');
+
+        // 6. Cargar usuarios sugeridos para descubrir
+        await userProvider.loadSuggestedUsers();
+        print('✅ Usuarios sugeridos cargados: ${userProvider.suggestedUsers.length}');
+
+        print('🎉 HomeScreen: Inicialización completa');
+      } else {
+        print('❌ No hay usuario autenticado');
       }
-    });
+    } catch (e) {
+      print('❌ Error inicializando providers: $e');
+    }
   }
 
   @override
@@ -69,18 +124,98 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       body: PageView(
         controller: _pageController,
         onPageChanged: (index) {
-          if (index != 2) {
-            setState(() {
-              _currentIndex = index;
-            });
-          }
+          setState(() {
+            _currentIndex = index;
+          });
+          // Cargar datos específicos según la pestaña
+          _onTabChanged(index);
         },
         children: _screens,
       ),
       bottomNavigationBar: _buildBottomNavigationBar(),
-      floatingActionButton: _buildFloatingActionButton(),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      floatingActionButton: _shouldShowFab() ? _buildFloatingActionButton() : null,
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
+  }
+
+  // Determinar si mostrar el FAB según la pestaña activa
+  bool _shouldShowFab() {
+    return _currentIndex == 0; // Solo mostrar en Feed (Inicio)
+  }
+
+  // Manejar cambios de pestaña para cargar datos específicos
+  void _onTabChanged(int index) {
+    switch (index) {
+      case 0: // Feed (Inicio)
+        _refreshFeedIfNeeded();
+        break;
+      case 1: // Explorar
+        _loadSuggestedUsersIfNeeded();
+        break;
+      case 2: // Matches
+        _loadMatchesIfNeeded();
+        break;
+      case 3: // Mascotas
+        _refreshPetsIfNeeded();
+        break;
+      case 4: // Perfil
+        _loadProfileStats();
+        break;
+    }
+  }
+
+  Future<void> _refreshFeedIfNeeded() async {
+    final postProvider = Provider.of<PostProvider>(context, listen: false);
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+
+    // Solo refrescar si han pasado más de 5 minutos o está vacío
+    if (postProvider.feedPosts.isEmpty) {
+      await postProvider.loadFeedPosts(refresh: true);
+
+      final authorIds = postProvider.feedPosts
+          .map((post) => post.authorId)
+          .toSet()
+          .toList();
+
+      if (authorIds.isNotEmpty) {
+        await userProvider.preloadUsersForFeed(authorIds);
+      }
+    }
+  }
+
+  Future<void> _loadSuggestedUsersIfNeeded() async {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+
+    if (userProvider.suggestedUsers.isEmpty) {
+      await userProvider.loadSuggestedUsers();
+    }
+  }
+
+  Future<void> _loadMatchesIfNeeded() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final matchProvider = Provider.of<MatchProvider>(context, listen: false);
+
+    if (authProvider.currentUser != null && matchProvider.userMatches.isEmpty) {
+      await matchProvider.loadUserMatches(authProvider.currentUser!.id);
+    }
+  }
+
+  void _refreshPetsIfNeeded() {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final petProvider = Provider.of<PetProvider>(context, listen: false);
+
+    if (authProvider.currentUser != null && petProvider.userPets.isEmpty) {
+      petProvider.loadUserPets(authProvider.currentUser!.id);
+    }
+  }
+
+  Future<void> _loadProfileStats() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+
+    if (authProvider.currentUser != null) {
+      await userProvider.getUserStats(authProvider.currentUser!.id);
+    }
   }
 
   Widget _buildBottomNavigationBar() {
@@ -97,13 +232,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildNavItem(0, Icons.home, 'Inicio'),
               _buildNavItem(1, Icons.explore, 'Explorar'),
-              const SizedBox(width: 60), // Espacio para el FAB
+              _buildNavItem(2, Icons.favorite, 'Matches'),
               _buildNavItem(3, Icons.pets, 'Mascotas'),
               _buildNavItem(4, Icons.person, 'Perfil'),
             ],
@@ -116,32 +251,84 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _buildNavItem(int index, IconData icon, String label) {
     final isSelected = _currentIndex == index;
 
-    return GestureDetector(
-      onTap: () => _onTabTapped(index),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: isSelected
-                  ? const Color(0xFF4A7AA7)
-                  : Colors.grey.shade400,
-              size: 24,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
+    // Agregar badge para matches si hay solicitudes pendientes
+    Widget iconWidget = Icon(
+      icon,
+      color: isSelected
+          ? const Color(0xFF4A7AA7)
+          : Colors.grey.shade400,
+      size: 24,
+    );
+
+    if (index == 2) { // Matches tab
+      iconWidget = Consumer<MatchProvider>(
+        builder: (context, matchProvider, child) {
+          final hasPendingRequests = matchProvider.pendingMatches.isNotEmpty;
+
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Icon(
+                icon,
                 color: isSelected
                     ? const Color(0xFF4A7AA7)
                     : Colors.grey.shade400,
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                size: 24,
               ),
-            ),
-          ],
+              if (hasPendingRequests)
+                Positioned(
+                  right: -6,
+                  top: -4,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      '${matchProvider.pendingMatches.length}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+      );
+    }
+
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => _onTabTapped(index),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              iconWidget,
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected
+                      ? const Color(0xFF4A7AA7)
+                      : Colors.grey.shade400,
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -150,14 +337,27 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _buildFloatingActionButton() {
     return ScaleTransition(
       scale: _fabAnimation,
-      child: FloatingActionButton(
-        onPressed: _createPost,
-        backgroundColor: const Color(0xFF4A7AA7),
-        elevation: 8,
-        child: const Icon(
-          Icons.add,
-          color: Colors.white,
-          size: 28,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 20),
+        child: FloatingActionButton.extended(
+          onPressed: _createPost,
+          backgroundColor: const Color(0xFF4A7AA7),
+          elevation: 8,
+          icon: const Icon(
+            Icons.add,
+            color: Colors.white,
+            size: 24,
+          ),
+          label: const Text(
+            'Publicar',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(25),
+          ),
         ),
       ),
     );
@@ -184,6 +384,29 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       MaterialPageRoute(
         builder: (context) => const PostCreateScreen(),
       ),
-    );
+    ).then((_) {
+      // Refrescar feed después de crear un post
+      _refreshFeedAfterPost();
+    });
+  }
+
+  Future<void> _refreshFeedAfterPost() async {
+    final postProvider = Provider.of<PostProvider>(context, listen: false);
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+
+    // Refrescar el feed para mostrar el nuevo post
+    await postProvider.loadFeedPosts(refresh: true);
+
+    // Precargar usuarios de los nuevos posts
+    final authorIds = postProvider.feedPosts
+        .map((post) => post.authorId)
+        .toSet()
+        .toList();
+
+    if (authorIds.isNotEmpty) {
+      await userProvider.preloadUsersForFeed(authorIds);
+    }
+
+    print('🔄 Feed refrescado después de crear post');
   }
 }
