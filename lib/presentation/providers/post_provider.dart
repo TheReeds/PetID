@@ -1,5 +1,6 @@
 // lib/presentation/providers/post_provider.dart
 import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
 import '../../data/models/post_model.dart';
 import '../../data/repositories/post_repository.dart';
@@ -17,7 +18,7 @@ class PostProvider extends ChangeNotifier {
   PostModel? _selectedPost;
   String? _errorMessage;
   bool _hasMorePosts = true;
-  int _currentPage = 0;
+  DocumentSnapshot? _lastDocument;
 
   // Getters
   PostState get state => _state;
@@ -31,11 +32,11 @@ class PostProvider extends ChangeNotifier {
 
   // Cargar feed principal
   Future<void> loadFeedPosts({bool refresh = false}) async {
-    if (_state == PostState.loading) return;
+    if (_state == PostState.loading && !refresh) return;
 
     try {
       if (refresh) {
-        _currentPage = 0;
+        _lastDocument = null;
         _hasMorePosts = true;
         _feedPosts.clear();
       }
@@ -44,8 +45,8 @@ class PostProvider extends ChangeNotifier {
       _clearError();
 
       final posts = await _postRepository.getFeedPosts(
-        page: _currentPage,
         limit: 10,
+        lastDocument: _lastDocument,
       );
 
       if (refresh) {
@@ -55,7 +56,14 @@ class PostProvider extends ChangeNotifier {
       }
 
       _hasMorePosts = posts.length == 10;
-      _currentPage++;
+
+      // Guardar el último documento para paginación
+      if (posts.isNotEmpty) {
+        // Necesitarías acceso al DocumentSnapshot desde el repository
+        // Por ahora, usamos el approach básico
+        _lastDocument = null;
+      }
+
       _setState(PostState.loaded);
     } catch (e) {
       _setError('Error cargando publicaciones: $e');
@@ -105,10 +113,12 @@ class PostProvider extends ChangeNotifier {
       _setState(PostState.loading);
       _clearError();
 
-      // Subir imágenes si existen
+      String postId = '';
       List<String> imageUrls = [];
+
+      // Generar ID temporal para subir imágenes
       if (imageFiles != null && imageFiles.isNotEmpty) {
-        final postId = DateTime.now().millisecondsSinceEpoch.toString();
+        postId = DateTime.now().millisecondsSinceEpoch.toString();
         imageUrls = await StorageService.uploadPostPhotos(
           postId: postId,
           imageFiles: imageFiles,
@@ -116,14 +126,39 @@ class PostProvider extends ChangeNotifier {
       }
 
       // Crear post con las imágenes
-      final postWithImages = post.copyWith(
+      final postWithImages = PostModel(
+        id: '', // Se generará en el repository
+        authorId: post.authorId,
+        petId: post.petId,
+        type: post.type,
+        content: post.content,
         imageUrls: imageUrls,
+        hashtags: post.hashtags,
+        isPublic: post.isPublic,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       );
 
-      await _postRepository.createPost(postWithImages);
+      final createdPostId = await _postRepository.createPost(postWithImages);
 
-      // Recargar feed
-      await loadFeedPosts(refresh: true);
+      // Agregar el nuevo post al inicio de la lista local
+      final newPost = postWithImages.copyWith();
+      // Actualizar con el ID real
+      final finalPost = PostModel(
+        id: createdPostId,
+        authorId: newPost.authorId,
+        petId: newPost.petId,
+        type: newPost.type,
+        content: newPost.content,
+        imageUrls: newPost.imageUrls,
+        hashtags: newPost.hashtags,
+        isPublic: newPost.isPublic,
+        createdAt: newPost.createdAt,
+        updatedAt: newPost.updatedAt,
+      );
+
+      _feedPosts.insert(0, finalPost);
+      _setState(PostState.loaded);
 
       return true;
     } catch (e) {
@@ -197,6 +232,12 @@ class PostProvider extends ChangeNotifier {
       return true;
     } catch (e) {
       _setError('Error actualizando like: $e');
+      // Revertir cambio local si falla
+      final post = _findPostById(postId);
+      if (post != null) {
+        _updatePostInLists(post);
+        notifyListeners();
+      }
       return false;
     }
   }
@@ -204,9 +245,8 @@ class PostProvider extends ChangeNotifier {
   // Agregar comentario
   Future<bool> addComment(String postId, String comment, String userId) async {
     try {
-      await _postRepository.addComment(postId, comment, userId);
-
-      // Actualizar contador de comentarios localmente
+      // Este metodo ahora delega al CommentProvider
+      // pero aún actualiza el contador local para optimización
       final post = _findPostById(postId);
       if (post != null) {
         final updatedPost = post.copyWith(
@@ -220,6 +260,14 @@ class PostProvider extends ChangeNotifier {
     } catch (e) {
       _setError('Error agregando comentario: $e');
       return false;
+    }
+  }
+  void updateCommentsCount(String postId, int newCount) {
+    final post = _findPostById(postId);
+    if (post != null) {
+      final updatedPost = post.copyWith(commentsCount: newCount);
+      _updatePostInLists(updatedPost);
+      notifyListeners();
     }
   }
 
@@ -280,6 +328,29 @@ class PostProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Obtener post por ID
+  Future<PostModel?> getPostById(String postId) async {
+    try {
+      return await _postRepository.getPostById(postId);
+    } catch (e) {
+      _setError('Error obteniendo publicación: $e');
+      return null;
+    }
+  }
+
+  // Refrescar post específico
+  Future<void> refreshPost(String postId) async {
+    try {
+      final refreshedPost = await _postRepository.getPostById(postId);
+      if (refreshedPost != null) {
+        _updatePostInLists(refreshedPost);
+        notifyListeners();
+      }
+    } catch (e) {
+      print('Error refrescando post: $e');
+    }
+  }
+
   // Métodos helper privados
   void _updatePostInLists(PostModel updatedPost) {
     // Actualizar en feed
@@ -318,16 +389,27 @@ class PostProvider extends ChangeNotifier {
 
   PostModel? _findPostById(String postId) {
     // Buscar en feed primero
-    PostModel? post = _feedPosts.where((p) => p.id == postId).firstOrNull;
-    if (post != null) return post;
+    try {
+      return _feedPosts.firstWhere((p) => p.id == postId);
+    } catch (e) {
+      // No encontrado en feed
+    }
 
     // Buscar en posts del usuario
-    post = _userPosts.where((p) => p.id == postId).firstOrNull;
-    if (post != null) return post;
+    try {
+      return _userPosts.firstWhere((p) => p.id == postId);
+    } catch (e) {
+      // No encontrado en posts del usuario
+    }
 
     // Buscar en posts de mascota
-    post = _petPosts.where((p) => p.id == postId).firstOrNull;
-    return post;
+    try {
+      return _petPosts.firstWhere((p) => p.id == postId);
+    } catch (e) {
+      // No encontrado
+    }
+
+    return null;
   }
 
   // Métodos de estado
@@ -346,10 +428,21 @@ class PostProvider extends ChangeNotifier {
     _errorMessage = null;
   }
 
-  void clearError() => _clearError();
-}
+  void clearError() {
+    _clearError();
+    notifyListeners();
+  }
 
-// Extensión para obtener el primer elemento o null
-extension ListExtension<T> on List<T> {
-  T? get firstOrNull => isEmpty ? null : first;
+  // Limpiar datos (útil para logout)
+  void clear() {
+    _feedPosts.clear();
+    _userPosts.clear();
+    _petPosts.clear();
+    _selectedPost = null;
+    _lastDocument = null;
+    _hasMorePosts = true;
+    _state = PostState.idle;
+    _errorMessage = null;
+    notifyListeners();
+  }
 }

@@ -1,3 +1,4 @@
+// lib/data/repositories/post_repository.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import '../models/post_model.dart';
@@ -11,6 +12,7 @@ class PostRepository {
   Future<List<PostModel>> getFeedPosts({
     int page = 0,
     int limit = 10,
+    DocumentSnapshot? lastDocument,
   }) async {
     try {
       Query query = FirebaseService.posts
@@ -18,10 +20,9 @@ class PostRepository {
           .orderBy('createdAt', descending: true)
           .limit(limit);
 
-      if (page > 0) {
-        // Para paginación, necesitarías implementar cursor-based pagination
-        // Por simplicidad, usamos offset básico
-        query = query.startAfter([DateTime.now().subtract(Duration(days: page))]);
+      // Para paginación con cursor
+      if (lastDocument != null) {
+        query = query.startAfterDocument(lastDocument);
       }
 
       final snapshot = await query.get();
@@ -29,6 +30,7 @@ class PostRepository {
           .map((doc) => PostModel.fromFirestore(doc))
           .toList();
     } catch (e) {
+      print('Error obteniendo feed: $e');
       throw Exception('Error obteniendo feed: $e');
     }
   }
@@ -59,15 +61,18 @@ class PostRepository {
   Future<String> createPost(PostModel post) async {
     try {
       final postId = _uuid.v4();
-      final newPost = post.copyWith();
 
-      await FirebaseService.posts.doc(postId).set({
-        ...newPost.toFirestore(),
+      // Crear el post con el ID generado
+      final postData = {
+        ...post.toFirestore(),
         'id': postId,
-      });
+      };
+
+      await FirebaseService.posts.doc(postId).set(postData);
 
       return postId;
     } catch (e) {
+      print('Error creando publicación: $e');
       throw Exception('Error creando publicación: $e');
     }
   }
@@ -75,8 +80,12 @@ class PostRepository {
   // Actualizar publicación
   Future<void> updatePost(PostModel post) async {
     try {
-      await FirebaseService.posts.doc(post.id).update(post.toFirestore());
+      final updateData = post.toFirestore();
+      updateData['updatedAt'] = Timestamp.now();
+
+      await FirebaseService.posts.doc(post.id).update(updateData);
     } catch (e) {
+      print('Error actualizando publicación: $e');
       throw Exception('Error actualizando publicación: $e');
     }
   }
@@ -96,6 +105,7 @@ class PostRepository {
 
       await FirebaseService.posts.doc(postId).delete();
     } catch (e) {
+      print('Error eliminando publicación: $e');
       throw Exception('Error eliminando publicación: $e');
     }
   }
@@ -126,6 +136,7 @@ class PostRepository {
         });
       });
     } catch (e) {
+      print('Error actualizando like: $e');
       throw Exception('Error actualizando like: $e');
     }
   }
@@ -155,6 +166,7 @@ class PostRepository {
         'updatedAt': Timestamp.now(),
       });
     } catch (e) {
+      print('Error agregando comentario: $e');
       throw Exception('Error agregando comentario: $e');
     }
   }
@@ -197,6 +209,7 @@ class PostRepository {
 
       return posts;
     } catch (e) {
+      print('Error buscando publicaciones: $e');
       throw Exception('Error buscando publicaciones: $e');
     }
   }
@@ -215,6 +228,7 @@ class PostRepository {
           .map((doc) => PostModel.fromFirestore(doc))
           .toList();
     } catch (e) {
+      print('Error obteniendo posts por hashtag: $e');
       throw Exception('Error obteniendo posts por hashtag: $e');
     }
   }
@@ -233,6 +247,7 @@ class PostRepository {
         'createdAt': Timestamp.now(),
       });
     } catch (e) {
+      print('Error reportando publicación: $e');
       throw Exception('Error reportando publicación: $e');
     }
   }
@@ -252,6 +267,7 @@ class PostRepository {
           .map((doc) => PostModel.fromFirestore(doc))
           .toList();
     } catch (e) {
+      print('Error obteniendo mascotas perdidas: $e');
       throw Exception('Error obteniendo mascotas perdidas: $e');
     }
   }
@@ -271,16 +287,24 @@ class PostRepository {
   // Obtener publicaciones populares (más likes)
   Future<List<PostModel>> getPopularPosts({int limit = 10}) async {
     try {
+      // Como Firestore no permite orderBy en arrays, obtenemos posts recientes
+      // y los ordenamos localmente por número de likes
       final snapshot = await FirebaseService.posts
           .where('isPublic', isEqualTo: true)
-          .orderBy('likes', descending: true)
-          .limit(limit)
+          .orderBy('createdAt', descending: true)
+          .limit(100)
           .get();
 
-      return snapshot.docs
+      List<PostModel> posts = snapshot.docs
           .map((doc) => PostModel.fromFirestore(doc))
           .toList();
+
+      // Ordenar por número de likes
+      posts.sort((a, b) => b.likes.length.compareTo(a.likes.length));
+
+      return posts.take(limit).toList();
     } catch (e) {
+      print('Error obteniendo posts populares: $e');
       throw Exception('Error obteniendo posts populares: $e');
     }
   }
@@ -306,7 +330,33 @@ class PostRepository {
           .map((doc) => PostModel.fromFirestore(doc))
           .toList();
     } catch (e) {
+      print('Error obteniendo posts cercanos: $e');
       throw Exception('Error obteniendo posts cercanos: $e');
+    }
+  }
+
+  // Obtener un post específico por ID
+  Future<PostModel?> getPostById(String postId) async {
+    try {
+      final doc = await FirebaseService.posts.doc(postId).get();
+      if (doc.exists) {
+        return PostModel.fromFirestore(doc);
+      }
+      return null;
+    } catch (e) {
+      print('Error obteniendo post por ID: $e');
+      throw Exception('Error obteniendo post por ID: $e');
+    }
+  }
+
+  // Verificar si existe un post
+  Future<bool> postExists(String postId) async {
+    try {
+      final doc = await FirebaseService.posts.doc(postId).get();
+      return doc.exists;
+    } catch (e) {
+      print('Error verificando existencia del post: $e');
+      return false;
     }
   }
 }

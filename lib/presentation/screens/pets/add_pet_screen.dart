@@ -1061,7 +1061,7 @@ class _AddPetScreenState extends State<AddPetScreen> with TickerProviderStateMix
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.of(context).pop();
+        Navigator.of(context).pushReplacementNamed('/home');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
