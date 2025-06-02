@@ -203,14 +203,11 @@ class _AICameraScreenState extends State<AICameraScreen> with TickerProviderStat
               child: ClipRect(
                 child: OverflowBox(
                   alignment: Alignment.center,
-                  child: FittedBox(
-                    fit: BoxFit.cover,
-                    child: SizedBox(
-                      width: constraints.maxWidth,
-                      height: constraints.maxWidth / _cameraController!.value.aspectRatio,
-                      child: CameraPreview(_cameraController!),
-                    ),
+                  child: AspectRatio(
+                    aspectRatio: _cameraController!.value.aspectRatio,
+                    child: CameraPreview(_cameraController!),
                   ),
+
                 ),
               ),
             ),

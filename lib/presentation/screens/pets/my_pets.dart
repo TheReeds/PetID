@@ -360,7 +360,27 @@ class _MyPetsScreenState extends State<MyPetsScreen> with TickerProviderStateMix
         return _buildPetsTab();
     }
   }
+  double _getCardAspectRatio(double screenWidth) {
+    if (screenWidth < 400) {
+      return 0.8; // Cards más altos en pantallas muy pequeñas
+    } else if (screenWidth < 600) {
+      return 0.75; // Ratio original
+    } else {
+      return 0.7; // Cards más anchos en pantallas grandes
+    }
+  }
 
+  int _getCrossAxisCount(double screenWidth) {
+    if (screenWidth < 400) {
+      return 1; // Una columna en pantallas muy pequeñas
+    } else if (screenWidth < 600) {
+      return 2; // Dos columnas (default)
+    } else if (screenWidth < 900) {
+      return 3; // Tres columnas en tablets
+    } else {
+      return 4; // Cuatro columnas en pantallas grandes
+    }
+  }
   Widget _buildPetsTab() {
     return Consumer<PetProvider>(
       builder: (context, petProvider, child) {
@@ -485,23 +505,18 @@ class _MyPetsScreenState extends State<MyPetsScreen> with TickerProviderStateMix
             else
               LayoutBuilder(
                   builder: (context, constraints) {
-                    // Calcular número de columnas basado en el ancho
-                    int crossAxisCount = 2;
-                    if (constraints.maxWidth > 600) {
-                      crossAxisCount = 3;
-                    }
-                    if (constraints.maxWidth > 900) {
-                      crossAxisCount = 4;
-                    }
+                    final screenWidth = constraints.maxWidth;
+                    final crossAxisCount = _getCrossAxisCount(screenWidth);
+                    final aspectRatio = _getCardAspectRatio(screenWidth);
 
                     return GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: crossAxisCount,
-                        mainAxisSpacing: 16,
-                        crossAxisSpacing: 16,
-                        childAspectRatio: 0.75, // Ajustado para mejor proporción
+                        mainAxisSpacing: crossAxisCount == 1 ? 12 : 16, // Menos espacio para una columna
+                        crossAxisSpacing: crossAxisCount == 1 ? 0 : 16,
+                        childAspectRatio: aspectRatio,
                       ),
                       itemCount: pets.length,
                       itemBuilder: (context, index) => _buildPetCard(pets[index]),
@@ -1691,128 +1706,152 @@ class _MyPetsScreenState extends State<MyPetsScreen> with TickerProviderStateMix
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(28),
-            topRight: Radius.circular(28),
+      isScrollControlled: true, // Importante: permite control total de altura
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85, // Máximo 85% de la pantalla
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6, // Inicia con 60% de la pantalla
+        minChildSize: 0.4,     // Mínimo 40%
+        maxChildSize: 0.85,    // Máximo 85%
+        expand: false,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(28),
+              topRight: Radius.circular(28),
+            ),
           ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Header mejorado con más información
-            _buildPetHeader(pet),
-            const SizedBox(height: 24),
-
-            // Información rápida
-            _buildQuickInfo(pet),
-            const SizedBox(height: 24),
-
-            // Opciones mejoradas
-            _buildOptionTile(
-              icon: Icons.info_outline_rounded,
-              title: 'Ver detalles completos',
-              subtitle: 'Información médica, fotos y más',
-              color: const Color(0xFF4A7AA7),
-              onTap: () {
-                Navigator.of(context).pop();
-                _showPetDetails(pet);
-              },
-            ),
-
-            const SizedBox(height: 12),
-
-            _buildOptionTile(
-              icon: Icons.edit_outlined,
-              title: 'Editar información',
-              subtitle: 'Actualizar datos de ${pet.name}',
-              color: Colors.blue,
-              onTap: () {
-                Navigator.of(context).pop();
-                _editPet(pet);
-              },
-            ),
-
-            const SizedBox(height: 12),
-
-            _buildOptionTile(
-              icon: Icons.qr_code_rounded,
-              title: 'Código QR',
-              subtitle: 'Ver y compartir código QR',
-              color: Colors.purple,
-              onTap: () {
-                Navigator.of(context).pop();
-                _showQRCodeDialog(pet);
-              },
-            ),
-
-            const SizedBox(height: 12),
-
-            if (!pet.isLost)
-              _buildOptionTile(
-                icon: Icons.warning_amber_rounded,
-                title: 'Reportar como perdida',
-                subtitle: 'Crear reporte de mascota perdida',
-                color: Colors.red,
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _reportPetLost(pet);
-                },
-              )
-            else
-              _buildOptionTile(
-                icon: Icons.check_circle_outline_rounded,
-                title: 'Marcar como encontrada',
-                subtitle: 'La mascota ya está en casa',
-                color: Colors.green,
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _markPetAsFound(pet);
-                },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle del modal
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
 
-            const SizedBox(height: 12),
+              // Contenido scrolleable
+              Flexible(
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.only(
+                    left: 24,
+                    right: 24,
+                    top: 12,
+                    bottom: 32, // Padding extra en el bottom
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Header mejorado con más información
+                      _buildPetHeader(pet),
+                      const SizedBox(height: 16), // Reducido de 24
 
-            _buildOptionTile(
-              icon: Icons.medical_services_outlined,
-              title: 'Registro médico',
-              subtitle: 'Ver historial de salud',
-              color: Colors.teal,
-              onTap: () {
-                Navigator.of(context).pop();
-                _showMedicalHistory(pet);
-              },
-            ),
+                      // Información rápida
+                      _buildQuickInfo(pet),
+                      const SizedBox(height: 16), // Reducido de 24
 
-            const SizedBox(height: 12),
+                      // Opciones mejoradas
+                      _buildOptionTile(
+                        icon: Icons.info_outline_rounded,
+                        title: 'Ver detalles completos',
+                        subtitle: 'Información médica, fotos y más',
+                        color: const Color(0xFF4A7AA7),
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          _showPetDetails(pet);
+                        },
+                      ),
 
-            _buildOptionTile(
-              icon: Icons.share_outlined,
-              title: 'Compartir mascota',
-              subtitle: 'Compartir información de ${pet.name}',
-              color: Colors.orange,
-              onTap: () {
-                Navigator.of(context).pop();
-                _sharePet(pet);
-              },
-            ),
+                      const SizedBox(height: 12),
 
-            const SizedBox(height: 32),
-          ],
+                      _buildOptionTile(
+                        icon: Icons.edit_outlined,
+                        title: 'Editar información',
+                        subtitle: 'Actualizar datos de ${pet.name}',
+                        color: Colors.blue,
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          _editPet(pet);
+                        },
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      _buildOptionTile(
+                        icon: Icons.qr_code_rounded,
+                        title: 'Código QR',
+                        subtitle: 'Ver y compartir código QR',
+                        color: Colors.purple,
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          _showQRCodeDialog(pet);
+                        },
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      if (!pet.isLost)
+                        _buildOptionTile(
+                          icon: Icons.warning_amber_rounded,
+                          title: 'Reportar como perdida',
+                          subtitle: 'Crear reporte de mascota perdida',
+                          color: Colors.red,
+                          onTap: () {
+                            Navigator.of(context).pop();
+                            _reportPetLost(pet);
+                          },
+                        )
+                      else
+                        _buildOptionTile(
+                          icon: Icons.check_circle_outline_rounded,
+                          title: 'Marcar como encontrada',
+                          subtitle: 'La mascota ya está en casa',
+                          color: Colors.green,
+                          onTap: () {
+                            Navigator.of(context).pop();
+                            _markPetAsFound(pet);
+                          },
+                        ),
+
+                      const SizedBox(height: 12),
+
+                      _buildOptionTile(
+                        icon: Icons.medical_services_outlined,
+                        title: 'Registro médico',
+                        subtitle: 'Ver historial de salud',
+                        color: Colors.teal,
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          _showMedicalHistory(pet);
+                        },
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      _buildOptionTile(
+                        icon: Icons.share_outlined,
+                        title: 'Compartir mascota',
+                        subtitle: 'Compartir información de ${pet.name}',
+                        color: Colors.orange,
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          _sharePet(pet);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1821,10 +1860,10 @@ class _MyPetsScreenState extends State<MyPetsScreen> with TickerProviderStateMix
     return Row(
       children: [
         Container(
-          width: 80,
-          height: 80,
+          width: 70, // Reducido de 80
+          height: 70, // Reducido de 80
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(16), // Reducido de 20
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.1),
@@ -1834,7 +1873,7 @@ class _MyPetsScreenState extends State<MyPetsScreen> with TickerProviderStateMix
             ],
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(16),
             child: pet.profilePhoto != null
                 ? Image.network(
               pet.profilePhoto!,
@@ -1856,17 +1895,18 @@ class _MyPetsScreenState extends State<MyPetsScreen> with TickerProviderStateMix
                     child: Text(
                       pet.name,
                       style: const TextStyle(
-                        fontSize: 24,
+                        fontSize: 20, // Reducido de 24
                         fontWeight: FontWeight.bold,
                       ),
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  const SizedBox(width: 8),
                   Icon(
                     _getPetTypeIcon(pet.type),
                     color: const Color(0xFF4A7AA7),
-                    size: 24,
+                    size: 20, // Reducido de 24
                   ),
                 ],
               ),
@@ -1874,59 +1914,64 @@ class _MyPetsScreenState extends State<MyPetsScreen> with TickerProviderStateMix
               Text(
                 '${pet.breed} • ${pet.displayAge}',
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 14, // Reducido de 16
                   color: Colors.grey.shade600,
                 ),
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: pet.isLost ? Colors.red.shade100 : Colors.green.shade100,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      pet.isLost ? 'Perdida' : 'En casa',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: pet.isLost ? Colors.red.shade700 : Colors.green.shade700,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  if (pet.isVaccinated)
+              const SizedBox(height: 6), // Reducido de 8
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
                     Container(
-                      padding: const EdgeInsets.all(4),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.green.shade100,
-                        shape: BoxShape.circle,
+                        color: pet.isLost ? Colors.red.shade100 : Colors.green.shade100,
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(
-                        Icons.medical_services,
-                        size: 12,
-                        color: Colors.green.shade700,
+                      child: Text(
+                        pet.isLost ? 'Perdida' : 'En casa',
+                        style: TextStyle(
+                          fontSize: 11, // Reducido de 12
+                          color: pet.isLost ? Colors.red.shade700 : Colors.green.shade700,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                  if (pet.isMicrochipped)
-                    Container(
-                      margin: const EdgeInsets.only(left: 4),
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade100,
-                        shape: BoxShape.circle,
+                    if (pet.isVaccinated) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.all(3), // Reducido de 4
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade100,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.medical_services,
+                          size: 10, // Reducido de 12
+                          color: Colors.green.shade700,
+                        ),
                       ),
-                      child: Icon(
-                        Icons.memory,
-                        size: 12,
-                        color: Colors.blue.shade700,
+                    ],
+                    if (pet.isMicrochipped) ...[
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.all(3), // Reducido de 4
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade100,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.memory,
+                          size: 10, // Reducido de 12
+                          color: Colors.blue.shade700,
+                        ),
                       ),
-                    ),
-                ],
+                    ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -1937,7 +1982,7 @@ class _MyPetsScreenState extends State<MyPetsScreen> with TickerProviderStateMix
 
   Widget _buildQuickInfo(PetModel pet) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12), // Reducido de 16
       decoration: BoxDecoration(
         color: Colors.grey.shade50,
         borderRadius: BorderRadius.circular(16),
@@ -1970,7 +2015,7 @@ class _MyPetsScreenState extends State<MyPetsScreen> with TickerProviderStateMix
             ],
           ),
           if (pet.healthInfo != null) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 12), // Reducido de 16
             Row(
               children: [
                 Expanded(
@@ -2002,15 +2047,16 @@ class _MyPetsScreenState extends State<MyPetsScreen> with TickerProviderStateMix
     );
   }
 
+
   Widget _buildQuickInfoItem(String label, String value, IconData icon) {
     return Column(
       children: [
-        Icon(icon, color: const Color(0xFF4A7AA7), size: 20),
-        const SizedBox(height: 4),
+        Icon(icon, color: const Color(0xFF4A7AA7), size: 18), // Reducido de 20
+        const SizedBox(height: 3), // Reducido de 4
         Text(
           value,
           style: const TextStyle(
-            fontSize: 14,
+            fontSize: 13, // Reducido de 14
             fontWeight: FontWeight.bold,
           ),
           maxLines: 1,
@@ -2019,7 +2065,7 @@ class _MyPetsScreenState extends State<MyPetsScreen> with TickerProviderStateMix
         Text(
           label,
           style: TextStyle(
-            fontSize: 11,
+            fontSize: 10, // Reducido de 11
             color: Colors.grey.shade600,
           ),
         ),

@@ -307,19 +307,36 @@ class _PetDetailScreenState extends State<PetDetailScreen> with TickerProviderSt
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.end, // Alineación mejorada
                     children: [
                       Expanded(
-                        child: Text(
-                          widget.pet.name,
-                          style: const TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.pet.name,
+                              style: const TextStyle(
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                              maxLines: 2, // Permitir 2 líneas
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${widget.pet.breed} • ${widget.pet.displayAge}',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                color: Colors.white,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
                       ),
+                      const SizedBox(width: 12), // Espacio entre texto e ícono
                       Icon(
                         _getPetTypeIcon(widget.pet.type),
                         color: Colors.white,
@@ -338,15 +355,18 @@ class _PetDetailScreenState extends State<PetDetailScreen> with TickerProviderSt
                   const SizedBox(height: 8),
 
                   // Indicadores de salud rápidos
-                  Row(
-                    children: [
-                      if (widget.pet.isVaccinated)
-                        _buildHealthBadge(Icons.vaccines, 'Vacunado'),
-                      if (widget.pet.isMicrochipped)
-                        _buildHealthBadge(Icons.memory, 'Microchip'),
-                      if (widget.pet.isNeutered)
-                        _buildHealthBadge(Icons.healing, 'Esterilizado'),
-                    ],
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        if (widget.pet.isVaccinated)
+                          _buildHealthBadge(Icons.vaccines, 'Vacunado'),
+                        if (widget.pet.isMicrochipped)
+                          _buildHealthBadge(Icons.memory, 'Microchip'),
+                        if (widget.pet.isNeutered)
+                          _buildHealthBadge(Icons.healing, 'Esterilizado'),
+                      ],
+                    ),
                   ),
                 ],
               ),
