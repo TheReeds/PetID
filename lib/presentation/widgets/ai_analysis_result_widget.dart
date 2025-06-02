@@ -1,3 +1,4 @@
+// lib/presentation/widgets/ai_analysis_result_widget.dart (COMPLETO)
 import 'package:flutter/material.dart';
 import 'dart:math' as Math;
 import '../../data/models/ai_recognition_result.dart';
@@ -100,6 +101,9 @@ class _AIAnalysisResultWidgetState extends State<AIAnalysisResultWidget>
   }
 
   Widget _buildResultHeader() {
+    final breedAnalysis = widget.result.breedAnalysis;
+    final bestResult = breedAnalysis.bestResult;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -124,7 +128,7 @@ class _AIAnalysisResultWidgetState extends State<AIAnalysisResultWidget>
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
-                  Icons.pets,
+                  Icons.psychology,
                   color: Colors.white,
                   size: 30,
                 ),
@@ -144,7 +148,7 @@ class _AIAnalysisResultWidgetState extends State<AIAnalysisResultWidget>
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      widget.result.summary,
+                      '${breedAnalysis.modelCount} modelo${breedAnalysis.modelCount != 1 ? 's' : ''} de IA analizaron la imagen',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 14,
@@ -164,49 +168,84 @@ class _AIAnalysisResultWidgetState extends State<AIAnalysisResultWidget>
                 color: Colors.white.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Column(
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'Raza Detectada',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                        ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Raza Identificada',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                            ),
+                          ),
+                          Text(
+                            bestResult.breed,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ),
-                      Text(
-                        widget.result.breed.breed,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          const Text(
+                            'Confianza',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                            ),
+                          ),
+                          Text(
+                            bestResult.confidencePercentage,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      const Text(
-                        'Confianza',
-                        style: TextStyle(
+
+                  // Indicador de consenso
+                  if (breedAnalysis.modelCount > 1) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Icon(
+                          breedAnalysis.hasConsensus ? Icons.check_circle : Icons.info,
                           color: Colors.white,
-                          fontSize: 12,
+                          size: 16,
                         ),
-                      ),
-                      Text(
-                        widget.result.breed.confidencePercentage,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                        const SizedBox(width: 8),
+                        Text(
+                          'Consenso: ${breedAnalysis.consensusLevel}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
+                        const Spacer(),
+                        Text(
+                          'Tiempo: ${widget.result.totalProcessingTime.inSeconds}s',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -240,48 +279,634 @@ class _AIAnalysisResultWidgetState extends State<AIAnalysisResultWidget>
     );
   }
 
+  // PESTAÑA DE RAZA MEJORADA CON TODOS LOS MODELOS
   Widget _buildBreedTab() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (widget.result.hasBreedInfo) ...[
-            _buildInfoCard(
-              title: 'Información de Raza',
-              children: [
-                _buildInfoRow(
-                  'Raza',
-                  widget.result.breed.breed,
-                  Icons.pets,
-                ),
-                _buildInfoRow(
-                  'Confianza',
-                  widget.result.breed.confidencePercentage,
-                  Icons.bar_chart,
-                ),
-                _buildInfoRow(
-                  'Nivel de Confianza',
-                  widget.result.breed.confidenceLevel,
-                  Icons.speed,
-                ),
-                if (widget.result.breed.source != null)
-                  _buildInfoRow(
-                    'Fuente',
-                    widget.result.breed.source!,
-                    Icons.source,
-                  ),
-              ],
-            ),
+          // Mejor resultado (destacado)
+          _buildBestResultCard(),
 
+          const SizedBox(height: 20),
+
+          // Consenso y estadísticas
+          if (widget.result.breedAnalysis.modelCount > 1) ...[
+            _buildConsensusCard(),
             const SizedBox(height: 20),
+          ],
 
-            _buildConfidenceIndicator(),
-          ] else
-            _buildNoBreedInfo(),
+          // Resultados de todos los modelos
+          _buildAllModelsCard(),
+
+          const SizedBox(height: 20),
+
+          // Indicador de confianza del mejor resultado
+          if (widget.result.hasBreedInfo) _buildConfidenceIndicator(),
         ],
       ),
     );
+  }
+
+  Widget _buildBestResultCard() {
+    final bestResult = widget.result.breedAnalysis.bestResult;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF4A7AA7),
+            const Color(0xFF6B9BD1),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.emoji_events, color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Mejor Resultado',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              if (bestResult.source != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    bestResult.source!,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            bestResult.breed,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Text(
+                'Confianza: ${bestResult.confidencePercentage}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  bestResult.confidenceLevel,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildConsensusCard() {
+    final breedAnalysis = widget.result.breedAnalysis;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: breedAnalysis.hasConsensus ? Colors.green.withOpacity(0.3) : Colors.orange.withOpacity(0.3),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                breedAnalysis.hasConsensus ? Icons.check_circle : Icons.info,
+                color: breedAnalysis.hasConsensus ? Colors.green : Colors.orange,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Análisis de Consenso',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: breedAnalysis.hasConsensus ? Colors.green[700] : Colors.orange[700],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatItem(
+                  'Modelos Usados',
+                  '${breedAnalysis.modelCount}/3',
+                  Icons.psychology,
+                ),
+              ),
+              Expanded(
+                child: _buildStatItem(
+                  'Nivel de Consenso',
+                  breedAnalysis.consensusLevel,
+                  Icons.thumbs_up_down,
+                ),
+              ),
+              Expanded(
+                child: _buildStatItem(
+                  'Tiempo',
+                  '${breedAnalysis.processingDuration.inMilliseconds}ms',
+                  Icons.timer,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAllModelsCard() {
+    final breedAnalysis = widget.result.breedAnalysis;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Resultados por Modelo de IA',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Google Vision
+          _buildModelResultCard(
+            'Google Vision',
+            breedAnalysis.googleVisionResult,
+            Icons.visibility,
+            const Color(0xFF4285F4),
+            'Reconocimiento general de objetos e imágenes',
+          ),
+
+          const SizedBox(height: 12),
+
+          // Roboflow
+          _buildModelResultCard(
+            'Roboflow',
+            breedAnalysis.roboflowResult,
+            Icons.pets,
+            const Color(0xFF6366F1),
+            'Especializado en clasificación de razas de perros',
+          ),
+
+          const SizedBox(height: 12),
+
+          // Clarifai
+          _buildModelResultCard(
+            'Clarifai',
+            breedAnalysis.clarifaiResult,
+            Icons.psychology,
+            const Color(0xFF8B5CF6),
+            'Reconocimiento visual e inteligencia artificial',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModelResultCard(
+      String modelName,
+      BreedRecognitionResult? result,
+      IconData icon,
+      Color color,
+      String description,
+      ) {
+    final bool isAvailable = result != null;
+    final bool isBestResult = isAvailable &&
+        result.breed == widget.result.breedAnalysis.bestResult.breed &&
+        result.confidence == widget.result.breedAnalysis.bestResult.confidence;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isAvailable ? Colors.grey[50] : Colors.grey[100],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isBestResult
+              ? Colors.green.withOpacity(0.5)
+              : isAvailable
+              ? color.withOpacity(0.3)
+              : Colors.grey.withOpacity(0.3),
+          width: isBestResult ? 2 : 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isAvailable ? color.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  color: isAvailable ? color : Colors.grey,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          modelName,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: isAvailable ? Colors.black87 : Colors.grey[600],
+                          ),
+                        ),
+                        if (isBestResult) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.green,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'MEJOR',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 8,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    Text(
+                      description,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          if (isAvailable && result.isValid) ...[
+            // Resultado válido
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Raza Detectada',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      Text(
+                        result.breed,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      'Confianza',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: FractionallySizedBox(
+                            alignment: Alignment.centerLeft,
+                            widthFactor: result.confidence,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: _getConfidenceColor(result.confidence),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          result.confidencePercentage,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: _getConfidenceColor(result.confidence),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ] else if (isAvailable && !result.isValid) ...[
+            // Error o resultado inválido
+            Row(
+              children: [
+                Icon(Icons.error_outline, size: 16, color: Colors.red[400]),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    result.error ?? 'No se pudo determinar la raza',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.red[600],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ] else ...[
+            // API no disponible
+            Row(
+              children: [
+                Icon(Icons.cloud_off, size: 16, color: Colors.grey[400]),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'API no configurada',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatItem(String label, String value, IconData icon) {
+    return Column(
+      children: [
+        Icon(icon, color: Colors.grey[600], size: 20),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            color: Colors.grey[600],
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+
+  Color _getConfidenceColor(double confidence) {
+    if (confidence >= 0.8) return Colors.green;
+    if (confidence >= 0.6) return Colors.orange;
+    if (confidence >= 0.4) return Colors.yellow[700]!;
+    return Colors.red;
+  }
+
+  Widget _buildConfidenceIndicator() {
+    final confidence = widget.result.breedAnalysis.bestResult.confidence;
+    final color = _getConfidenceColor(confidence);
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Análisis de Confianza',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: confidence,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: color,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                widget.result.breedAnalysis.bestResult.confidencePercentage,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _getConfidenceDescription(confidence),
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+            ),
+          ),
+
+          // Información adicional sobre el consenso
+          if (widget.result.breedAnalysis.modelCount > 1) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, size: 16, color: Colors.blue[700]),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _getConsensusDescription(),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.blue[700],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _getConfidenceDescription(double confidence) {
+    if (confidence >= 0.8) {
+      return 'Muy confiable - La identificación es muy precisa';
+    } else if (confidence >= 0.6) {
+      return 'Confiable - La identificación es bastante precisa';
+    } else if (confidence >= 0.4) {
+      return 'Moderado - La identificación puede ser correcta';
+    } else {
+      return 'Bajo - La identificación es incierta';
+    }
+  }
+
+  String _getConsensusDescription() {
+    final breedAnalysis = widget.result.breedAnalysis;
+
+    if (breedAnalysis.hasConsensus) {
+      return 'Los modelos de IA están de acuerdo en la identificación, lo que aumenta la confiabilidad del resultado.';
+    } else if (breedAnalysis.modelCount > 1) {
+      return 'Los modelos de IA tienen opiniones diferentes. Te mostramos el resultado con mayor confianza.';
+    } else {
+      return 'Solo un modelo de IA pudo procesar la imagen. Considera verificar el resultado.';
+    }
   }
 
   Widget _buildCharacteristicsTab() {
@@ -433,129 +1058,6 @@ class _AIAnalysisResultWidgetState extends State<AIAnalysisResultWidget>
                 ),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildConfidenceIndicator() {
-    final confidence = widget.result.breed.confidence;
-    final color = confidence >= 0.8
-        ? Colors.green
-        : confidence >= 0.6
-        ? Colors.orange
-        : confidence >= 0.4
-        ? Colors.yellow[700]
-        : Colors.red;
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Nivel de Confianza',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[200],
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: FractionallySizedBox(
-                    alignment: Alignment.centerLeft,
-                    widthFactor: confidence,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: color,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                widget.result.breed.confidencePercentage,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _getConfidenceDescription(confidence),
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNoBreedInfo() {
-    return Container(
-      padding: const EdgeInsets.all(30),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Icon(
-            Icons.help_outline,
-            size: 64,
-            color: Colors.grey[400],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No se pudo determinar la raza',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[700],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Intenta con una imagen más clara donde se vea mejor la mascota',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
-            textAlign: TextAlign.center,
           ),
         ],
       ),
@@ -742,18 +1244,6 @@ class _AIAnalysisResultWidgetState extends State<AIAnalysisResultWidget>
         return 'Raza';
       default:
         return key[0].toUpperCase() + key.substring(1);
-    }
-  }
-
-  String _getConfidenceDescription(double confidence) {
-    if (confidence >= 0.8) {
-      return 'Muy confiable - La identificación es muy precisa';
-    } else if (confidence >= 0.6) {
-      return 'Confiable - La identificación es bastante precisa';
-    } else if (confidence >= 0.4) {
-      return 'Moderado - La identificación puede ser correcta';
-    } else {
-      return 'Bajo - La identificación es incierta';
     }
   }
 

@@ -17,7 +17,7 @@ class AIRecognitionService {
 
   // URLs de APIs
   static const String _googleVisionUrl = 'https://vision.googleapis.com/v1/images:annotate';
-  static const String _roboflowUrl = 'https://detect.roboflow.com/dog-breed-classification/1';
+  static const String _roboflowUrl = 'https://serverless.roboflow.com/dog-breeds-uvqar-ignp4/2';
   static const String _clarifaiUrl = 'https://api.clarifai.com/v2/models/general-image-recognition/outputs';
 
   // Reconocer raza de mascota usando múltiples APIs
@@ -109,38 +109,158 @@ class AIRecognitionService {
 
   // Análisis completo de la imagen (raza + características)
   static Future<PetAnalysisResult> analyzeImage(File imageFile) async {
+    final startTime = DateTime.now();
+
     try {
       if (kDebugMode) {
-        print('Iniciando análisis completo de imagen...');
+        print('🚀 Iniciando análisis completo de imagen...');
       }
 
       // Ejecutar análisis en paralelo
       final results = await Future.wait([
-        recognizeBreed(imageFile),
+        recognizeBreedWithAllModels(imageFile), // CAMBIADO: usar el nuevo método
         _detectPetCharacteristics(imageFile),
         findSimilarPets(imageFile),
       ]);
 
-      final breedResult = results[0] as BreedRecognitionResult;
+      final breedAnalysis = results[0] as MultiModelBreedResult;
       final characteristics = results[1] as Map<String, dynamic>;
       final similarPets = results[2] as List<SimilarPetResult>;
 
+      final endTime = DateTime.now();
+      final totalProcessingTime = endTime.difference(startTime);
+
+      if (kDebugMode) {
+        print('✅ Análisis completo terminado en ${totalProcessingTime.inSeconds}s');
+        print('📊 Modelos usados: ${breedAnalysis.modelCount}');
+        print('🤝 Consenso: ${breedAnalysis.consensusLevel}');
+        print('🔍 Mascotas similares: ${similarPets.length}');
+      }
+
       return PetAnalysisResult(
-        breed: breedResult,
+        breedAnalysis: breedAnalysis,
         characteristics: characteristics,
         similarPets: similarPets,
         detectedType: characteristics['type'] ?? 'Desconocido',
         estimatedAge: characteristics['age'] ?? 'Desconocido',
         estimatedSize: characteristics['size'] ?? 'Desconocido',
+        analysisTime: startTime,
+        totalProcessingTime: totalProcessingTime,
       );
     } catch (e) {
       if (kDebugMode) {
-        print('Error en análisis completo: $e');
+        print('❌ Error en análisis completo: $e');
       }
-      return PetAnalysisResult.error('Error al analizar imagen: $e');
+
+      final endTime = DateTime.now();
+      final totalProcessingTime = endTime.difference(startTime);
+
+      return PetAnalysisResult.error('Error al analizar imagen: $e')
+        ..totalProcessingTime = totalProcessingTime;
     }
   }
+  static Future<MultiModelBreedResult> recognizeBreedWithAllModels(File imageFile) async {
+    final startTime = DateTime.now();
 
+    try {
+      if (kDebugMode) {
+        print('Iniciando reconocimiento de raza con todos los modelos...');
+      }
+
+      // Comprimir imagen para APIs
+      final compressedImage = await _compressImage(imageFile);
+
+      // Ejecutar todos los servicios en paralelo y capturar cada resultado individualmente
+      final futures = <Future<BreedRecognitionResult>>[];
+      final sources = <String>[];
+
+      // Google Vision
+      if (_googleVisionApiKey != 'TU_GOOGLE_VISION_API_KEY') {
+        futures.add(_recognizeBreedWithGoogle(compressedImage));
+        sources.add('google');
+      }
+
+      // Roboflow
+      if (_roboflowApiKey != 'TU_ROBOFLOW_API_KEY') {
+        futures.add(_recognizeBreedWithRoboflow(compressedImage));
+        sources.add('roboflow');
+      }
+
+      // Clarifai
+      if (_clarifaiApiKey != 'TU_CLARIFAI_API_KEY') {
+        futures.add(_recognizeBreedWithClarifai(compressedImage));
+        sources.add('clarifai');
+      }
+
+      // Esperar todos los resultados
+      final results = await Future.wait(futures, eagerError: false);
+
+      // Asignar resultados a cada servicio
+      BreedRecognitionResult? googleResult;
+      BreedRecognitionResult? roboflowResult;
+      BreedRecognitionResult? clarifaiResult;
+
+      for (int i = 0; i < results.length; i++) {
+        switch (sources[i]) {
+          case 'google':
+            googleResult = results[i];
+            break;
+          case 'roboflow':
+            roboflowResult = results[i];
+            break;
+          case 'clarifai':
+            clarifaiResult = results[i];
+            break;
+        }
+      }
+
+      // Seleccionar el mejor resultado
+      final validResults = results.where((r) => r.isValid && r.confidence > 0.3).toList();
+      validResults.sort((a, b) => b.confidence.compareTo(a.confidence));
+
+      final bestResult = validResults.isNotEmpty
+          ? validResults.first
+          : BreedRecognitionResult(breed: 'Desconocida', confidence: 0.0);
+
+      final endTime = DateTime.now();
+      final processingDuration = endTime.difference(startTime);
+
+      if (kDebugMode) {
+        print('🎯 Análisis completado en ${processingDuration.inMilliseconds}ms');
+        print('📊 Google Vision: ${googleResult?.breed} (${googleResult?.confidencePercentage})');
+        print('📊 Roboflow: ${roboflowResult?.breed} (${roboflowResult?.confidencePercentage})');
+        print('📊 Clarifai: ${clarifaiResult?.breed} (${clarifaiResult?.confidencePercentage})');
+        print('🏆 Mejor resultado: ${bestResult.breed} (${bestResult.confidencePercentage})');
+      }
+
+      return MultiModelBreedResult(
+        googleVisionResult: googleResult,
+        roboflowResult: roboflowResult,
+        clarifaiResult: clarifaiResult,
+        bestResult: bestResult,
+        analysisTime: startTime,
+        processingDuration: processingDuration,
+      );
+
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error en reconocimiento de raza: $e');
+      }
+
+      final endTime = DateTime.now();
+      final processingDuration = endTime.difference(startTime);
+
+      return MultiModelBreedResult(
+        bestResult: BreedRecognitionResult(
+          breed: 'Desconocida',
+          confidence: 0.0,
+          error: 'Error al procesar imagen: $e',
+        ),
+        analysisTime: startTime,
+        processingDuration: processingDuration,
+      );
+    }
+  }
   // MÉTODOS PRIVADOS
 
   // Reconocimiento de raza con Google Vision
