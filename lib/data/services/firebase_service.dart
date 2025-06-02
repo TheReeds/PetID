@@ -26,7 +26,7 @@ class FirebaseService {
 
   // Stream del usuario actual
   static Stream<User?> get authStateChanges => _auth.authStateChanges();
-
+  static bool get isAuthenticated => _auth.currentUser != null;
   // Inicializar configuraciones de Firestore
   static Future<void> initialize() async {
     await _firestore.enableNetwork();

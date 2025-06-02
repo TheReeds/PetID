@@ -1,13 +1,16 @@
-// lib/presentation/screens/my_pets_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../../../data/models/lost_pet_model.dart';
 import '../../../data/models/pet_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/pet_provider.dart';
+import '../../providers/lost_pet_provider.dart';
 import '../social/profile_screen.dart';
 import 'add_pet_screen.dart';
 import 'pet_detail_screen.dart';
+import 'lost_pet_report_screen.dart';
+import 'lost_pets_screen.dart';
 
 class MyPetsScreen extends StatefulWidget {
   const MyPetsScreen({super.key});
@@ -44,8 +47,11 @@ class _MyPetsScreenState extends State<MyPetsScreen> with TickerProviderStateMix
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final petProvider = Provider.of<PetProvider>(context, listen: false);
+      final lostPetProvider = Provider.of<LostPetProvider>(context, listen: false);
+
       if (authProvider.currentUser != null) {
         petProvider.loadUserPets(authProvider.currentUser!.id);
+        lostPetProvider.loadUserReports(authProvider.currentUser!.id);
       }
     });
   }
@@ -75,6 +81,8 @@ class _MyPetsScreenState extends State<MyPetsScreen> with TickerProviderStateMix
                       padding: const EdgeInsets.all(24),
                       child: Column(
                         children: [
+                          _buildQuickActions(),
+                          const SizedBox(height: 24),
                           _buildNavigationTabs(),
                           const SizedBox(height: 24),
                           _buildContent(),
@@ -205,8 +213,81 @@ class _MyPetsScreenState extends State<MyPetsScreen> with TickerProviderStateMix
     );
   }
 
+  Widget _buildQuickActions() {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildQuickActionCard(
+            'Mascotas Perdidas',
+            Icons.warning,
+            Colors.red,
+                () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const LostPetsScreen(),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: _buildQuickActionCard(
+            'Agregar Mascota',
+            Icons.add_circle,
+            const Color(0xFF4A7AA7),
+            _addNewPet,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickActionCard(String title, IconData icon, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withOpacity(0.2), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildNavigationTabs() {
-    final tabs = ['Mascotas', 'Actividad', 'Recordatorios', 'Perfil'];
+    final tabs = ['Mascotas', 'Perdidas', 'Recordatorios', 'Perfil'];
 
     return Container(
       padding: const EdgeInsets.all(4),
@@ -261,7 +342,7 @@ class _MyPetsScreenState extends State<MyPetsScreen> with TickerProviderStateMix
       case 0:
         return _buildPetsTab();
       case 1:
-        return _buildActivityTab();
+        return _buildLostPetsTab();
       case 2:
         return _buildRemindersTab();
       case 3:
@@ -390,24 +471,95 @@ class _MyPetsScreenState extends State<MyPetsScreen> with TickerProviderStateMix
     );
   }
 
-  Widget _buildActivityTab() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.timeline, size: 64, color: Colors.grey),
-          SizedBox(height: 16),
-          Text(
-            'Actividad Reciente',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Próximamente: historial de actividades',
-            style: TextStyle(color: Colors.grey),
-          ),
-        ],
-      ),
+  Widget _buildLostPetsTab() {
+    return Consumer<LostPetProvider>(
+      builder: (context, lostPetProvider, child) {
+        if (lostPetProvider.isLoading) {
+          return const Center(
+            child: Column(
+              children: [
+                CircularProgressIndicator(color: Colors.red),
+                SizedBox(height: 16),
+                Text('Cargando reportes...'),
+              ],
+            ),
+          );
+        }
+
+        final userReports = lostPetProvider.userReports;
+        final activeReports = userReports.where((report) => report.isActive).length;
+
+        return Column(
+          children: [
+            // Estadísticas de reportes
+            Row(
+              children: [
+                Expanded(
+                  child: _buildStatCard(
+                    'Activos',
+                    '$activeReports',
+                    Icons.warning,
+                    Colors.red,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _buildStatCard(
+                    'Total',
+                    '${userReports.length}',
+                    Icons.report,
+                    Colors.orange,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _buildStatCard(
+                    'Encontradas',
+                    '${userReports.where((r) => r.status == LostPetStatus.found).length}',
+                    Icons.check_circle,
+                    Colors.green,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Mis Reportes',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const LostPetsScreen(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.search),
+                  label: const Text('Ver todas'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Lista de reportes
+            if (userReports.isEmpty)
+              _buildEmptyLostPetsState()
+            else
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: userReports.length,
+                itemBuilder: (context, index) => _buildLostPetReportCard(userReports[index]),
+              ),
+          ],
+        );
+      },
     );
   }
 
@@ -544,7 +696,7 @@ class _MyPetsScreenState extends State<MyPetsScreen> with TickerProviderStateMix
 
   Widget _buildPetCard(PetModel pet) {
     return GestureDetector(
-      onTap: () => _showPetDetails(pet),
+      onTap: () => _showPetOptions(pet),
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -647,7 +799,7 @@ class _MyPetsScreenState extends State<MyPetsScreen> with TickerProviderStateMix
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${pet.breed} • ${_calculateAge(pet.birthDate)} años',
+                      '${pet.breed} • ${pet.displayAge}',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey.shade600,
@@ -683,6 +835,107 @@ class _MyPetsScreenState extends State<MyPetsScreen> with TickerProviderStateMix
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildLostPetReportCard(LostPetModel report) {
+    final daysSince = DateTime.now().difference(report.lastSeenDate).inDays;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: report.isActive ? Colors.red.shade200 : Colors.grey.shade200,
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                report.petName,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: report.isActive ? Colors.red[100] : Colors.green[100],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  report.statusText,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: report.isActive ? Colors.red[700] : Colors.green[700],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            report.lastSeenLocationName,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            daysSince == 0 ? 'Hoy' : daysSince == 1 ? 'Ayer' : 'Hace $daysSince días',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[500],
+            ),
+          ),
+          if (report.isActive) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => _markAsFound(report),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.green,
+                      side: BorderSide(color: Colors.green.shade300),
+                    ),
+                    child: const Text('Encontrada'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => _editReport(report),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                    ),
+                    child: const Text('Editar'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -804,6 +1057,38 @@ class _MyPetsScreenState extends State<MyPetsScreen> with TickerProviderStateMix
     );
   }
 
+  Widget _buildEmptyLostPetsState() {
+    return Container(
+      padding: const EdgeInsets.all(40),
+      child: Column(
+        children: [
+          Icon(
+            Icons.check_circle,
+            size: 64,
+            color: Colors.green.shade400,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No tienes mascotas perdidas',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey.shade600,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '¡Todas tus mascotas están seguras!',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   IconData _getPetTypeIcon(PetType type) {
     switch (type) {
       case PetType.dog:
@@ -825,20 +1110,76 @@ class _MyPetsScreenState extends State<MyPetsScreen> with TickerProviderStateMix
     }
   }
 
-  int _calculateAge(DateTime birthDate) {
-    final now = DateTime.now();
-    int age = now.year - birthDate.year;
-    if (now.month < birthDate.month ||
-        (now.month == birthDate.month && now.day < birthDate.day)) {
-      age--;
-    }
-    return age;
-  }
-
   void _addNewPet() {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => const AddPetScreen(),
+      ),
+    );
+  }
+
+  void _showPetOptions(PetModel pet) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(24),
+            topRight: Radius.circular(24),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              pet.name,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 20),
+            ListTile(
+              leading: const Icon(Icons.info, color: Color(0xFF4A7AA7)),
+              title: const Text('Ver detalles'),
+              onTap: () {
+                Navigator.of(context).pop();
+                _showPetDetails(pet);
+              },
+            ),
+            if (!pet.isLost)
+              ListTile(
+                leading: const Icon(Icons.warning, color: Colors.red),
+                title: const Text('Reportar como perdida'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _reportPetLost(pet);
+                },
+              )
+            else
+              ListTile(
+                leading: const Icon(Icons.check_circle, color: Colors.green),
+                title: const Text('Marcar como encontrada'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _markPetAsFound(pet);
+                },
+              ),
+            const SizedBox(height: 20),
+          ],
+        ),
       ),
     );
   }
@@ -848,6 +1189,82 @@ class _MyPetsScreenState extends State<MyPetsScreen> with TickerProviderStateMix
       MaterialPageRoute(
         builder: (context) => PetDetailScreen(pet: pet),
       ),
+    );
+  }
+
+  void _reportPetLost(PetModel pet) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => LostPetReportScreen(pet: pet),
+      ),
+    ).then((success) {
+      if (success == true) {
+        // Recargar datos
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final petProvider = Provider.of<PetProvider>(context, listen: false);
+        final lostPetProvider = Provider.of<LostPetProvider>(context, listen: false);
+
+        if (authProvider.currentUser != null) {
+          petProvider.loadUserPets(authProvider.currentUser!.id);
+          lostPetProvider.loadUserReports(authProvider.currentUser!.id);
+        }
+      }
+    });
+  }
+
+  Future<void> _markPetAsFound(PetModel pet) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('¿${pet.name} fue encontrada?'),
+        content: const Text('Esto marcará la mascota como encontrada y cerrará el reporte.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            child: const Text('Sí, fue encontrada'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final petProvider = Provider.of<PetProvider>(context, listen: false);
+      final success = await petProvider.markPetAsFound(pet.id);
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('¡${pet.name} ha sido marcada como encontrada!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _markAsFound(LostPetModel report) async {
+    final lostPetProvider = Provider.of<LostPetProvider>(context, listen: false);
+    final success = await lostPetProvider.markPetAsFound(report.id, report.petId);
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('¡${report.petName} ha sido marcada como encontrada!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  void _editReport(LostPetModel report) {
+    // Implementar edición de reporte
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Función de editar reporte próximamente')),
     );
   }
 

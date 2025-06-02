@@ -5,6 +5,10 @@ import 'firebase_service.dart';
 
 class StorageService {
   static final FirebaseStorage _storage = FirebaseService.storage;
+  static const String _petsFolder = 'pets';
+  static const String _lostPetsFolder = 'lost_pets';
+  static const String _postsFolder = 'posts';
+  static const String _profilesFolder = 'profiles';
   static const _uuid = Uuid();
 
   // Subir foto de perfil de usuario
@@ -107,6 +111,49 @@ class StorageService {
   static Future<void> deletePhotos(List<String> downloadUrls) async {
     for (String url in downloadUrls) {
       await deletePhoto(url);
+    }
+  }
+  static Future<List<String>> uploadLostPetPhotos({
+    required String reportId,
+    required List<File> imageFiles,
+  }) async {
+    try {
+      List<String> downloadUrls = [];
+
+      for (File file in imageFiles) {
+        final fileName = '${_uuid.v4()}.jpg';
+        final ref = _storage.ref().child('$_lostPetsFolder/$reportId/$fileName');
+
+        final uploadTask = ref.putFile(file);
+        final snapshot = await uploadTask;
+        final downloadUrl = await snapshot.ref.getDownloadURL();
+
+        downloadUrls.add(downloadUrl);
+      }
+
+      return downloadUrls;
+    } catch (e) {
+      throw Exception('Error subiendo fotos de mascota perdida: $e');
+    }
+  }
+  static Future<void> deleteLostPetPhotos(String reportId) async {
+    try {
+      final ref = _storage.ref().child('$_lostPetsFolder/$reportId');
+      final listResult = await ref.listAll();
+
+      for (Reference item in listResult.items) {
+        await item.delete();
+      }
+    } catch (e) {
+      throw Exception('Error eliminando fotos de reporte: $e');
+    }
+  }
+  static Future<String> getDownloadUrl(String path) async {
+    try {
+      final ref = _storage.ref().child(path);
+      return await ref.getDownloadURL();
+    } catch (e) {
+      throw Exception('Error obteniendo URL de descarga: $e');
     }
   }
 }

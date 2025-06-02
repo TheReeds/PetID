@@ -1,4 +1,3 @@
-// lib/presentation/screens/home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -7,14 +6,15 @@ import '../../providers/pet_provider.dart';
 import '../../providers/post_provider.dart';
 import '../../providers/match_provider.dart';
 import '../../providers/user_provider.dart';
-import '../../providers/chat_provider.dart'; // Nuevo import
+import '../../providers/chat_provider.dart';
 import '../pets/my_pets.dart';
 import '../social/discover_screen.dart';
 import '../social/feed_screen.dart';
 import '../social/post_create_screen.dart';
 import '../matches/match_screen.dart';
 import '../social/profile_screen.dart';
-import '../chat/chat_list_screen.dart'; // Nueva pantalla de lista de chats
+import '../chat/chat_list_screen.dart';
+import '../ai/ai_hub_screen.dart'; // NUEVO IMPORT
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -32,7 +32,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final List<Widget> _screens = [
     const FeedScreen(),         // 0: Inicio
     const DiscoverScreen(),     // 1: Explorar
-    const ChatListScreen(),     // 2: Chats (Nueva pantalla)
+    const ChatListScreen(),     // 2: Chats
     const MatchScreen(),        // 3: Matches
     const MyPetsScreen(),       // 4: Mascotas
     const ProfileScreen(),      // 5: Perfil
@@ -65,7 +65,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       final postProvider = Provider.of<PostProvider>(context, listen: false);
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       final matchProvider = Provider.of<MatchProvider>(context, listen: false);
-      final chatProvider = Provider.of<ChatProvider>(context, listen: false); // Nuevo
+      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
       print('🚀 HomeScreen: Inicializando providers...');
 
@@ -105,7 +105,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         await userProvider.loadSuggestedUsers();
         print('✅ Usuarios sugeridos cargados: ${userProvider.suggestedUsers.length}');
 
-        // 7. Cargar chats del usuario (NUEVO)
+        // 7. Cargar chats del usuario
         await chatProvider.loadUserChats(userId);
         print('✅ Chats del usuario cargados: ${chatProvider.userChats.length}');
 
@@ -129,13 +129,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
+      appBar: _buildAppBar(), // NUEVO: AppBar con botón AI
       body: PageView(
         controller: _pageController,
         onPageChanged: (index) {
           setState(() {
             _currentIndex = index;
           });
-          // Cargar datos específicos según la pestaña
           _onTabChanged(index);
         },
         children: _screens,
@@ -143,6 +143,70 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       bottomNavigationBar: _buildBottomNavigationBar(),
       floatingActionButton: _shouldShowFab() ? _buildFloatingActionButton() : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+    );
+  }
+
+  // NUEVO: AppBar con botón de IA
+  PreferredSizeWidget? _buildAppBar() {
+    // Solo mostrar AppBar en ciertas pestañas
+    if (_currentIndex == 0 || _currentIndex == 4) { // Feed y Mascotas
+      return AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: Text(
+          _getAppBarTitle(),
+          style: const TextStyle(
+            color: Color(0xFF2C3E50),
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        actions: [
+          // Botón de IA
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFF4A7AA7),
+                  const Color(0xFF6B9BD1),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: IconButton(
+              onPressed: _openAIHub,
+              icon: const Icon(
+                Icons.psychology,
+                color: Colors.white,
+                size: 24,
+              ),
+              tooltip: 'Reconocimiento IA',
+            ),
+          ),
+        ],
+      );
+    }
+    return null;
+  }
+
+  String _getAppBarTitle() {
+    switch (_currentIndex) {
+      case 0:
+        return 'Inicio';
+      case 4:
+        return 'Mis Mascotas';
+      default:
+        return 'PetID';
+    }
+  }
+
+  // NUEVO: Abrir AI Hub
+  void _openAIHub() {
+    HapticFeedback.lightImpact();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const AIHubScreen(),
+      ),
     );
   }
 
@@ -160,7 +224,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       case 1: // Explorar
         _loadSuggestedUsersIfNeeded();
         break;
-      case 2: // Chats (NUEVO)
+      case 2: // Chats
         _refreshChatsIfNeeded();
         break;
       case 3: // Matches
@@ -179,7 +243,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final postProvider = Provider.of<PostProvider>(context, listen: false);
     final userProvider = Provider.of<UserProvider>(context, listen: false);
 
-    // Solo refrescar si han pasado más de 5 minutos o está vacío
     if (postProvider.feedPosts.isEmpty) {
       await postProvider.loadFeedPosts(refresh: true);
 
@@ -202,7 +265,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-  // NUEVO: Refrescar chats si es necesario
   Future<void> _refreshChatsIfNeeded() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
@@ -259,7 +321,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             children: [
               _buildNavItem(0, Icons.home, 'Inicio'),
               _buildNavItem(1, Icons.explore, 'Explorar'),
-              _buildNavItem(2, Icons.chat_bubble, 'Chats'), // NUEVO
+              _buildNavItem(2, Icons.chat_bubble, 'Chats'),
               _buildNavItem(3, Icons.favorite, 'Matches'),
               _buildNavItem(4, Icons.pets, 'Mascotas'),
               _buildNavItem(5, Icons.person, 'Perfil'),
@@ -273,7 +335,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _buildNavItem(int index, IconData icon, String label) {
     final isSelected = _currentIndex == index;
 
-    // Agregar badge para chats con mensajes no leídos
     Widget iconWidget = Icon(
       icon,
       color: isSelected
@@ -451,7 +512,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         builder: (context) => const PostCreateScreen(),
       ),
     ).then((_) {
-      // Refrescar feed después de crear un post
       _refreshFeedAfterPost();
     });
   }
@@ -460,10 +520,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final postProvider = Provider.of<PostProvider>(context, listen: false);
     final userProvider = Provider.of<UserProvider>(context, listen: false);
 
-    // Refrescar el feed para mostrar el nuevo post
     await postProvider.loadFeedPosts(refresh: true);
 
-    // Precargar usuarios de los nuevos posts
     final authorIds = postProvider.feedPosts
         .map((post) => post.authorId)
         .toSet()

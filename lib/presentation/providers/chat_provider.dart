@@ -91,6 +91,7 @@ class ChatProvider extends ChangeNotifier {
       );
 
       if (existingChat != null) {
+        _setState(ChatState.loaded);
         return existingChat.id;
       }
 

@@ -19,10 +19,10 @@ class MatchRepository {
     bool forPlaydate = false,
     double? maxDistance,
   }) {
-    Query query = FirebaseService.pets
+    Query query = _firestore
+        .collection('pets')  // ← Usar _firestore directamente
         .where('type', isEqualTo: type.toString().split('.').last)
-        .where('size', isEqualTo: size.toString().split('.').last)
-        .where('id', isNotEqualTo: petId);
+        .where('size', isEqualTo: size.toString().split('.').last);
 
     // Filtros adicionales
     if (forMating) {
@@ -35,14 +35,40 @@ class MatchRepository {
     return query
         .limit(50)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-        .map((doc) => PetModel.fromFirestore(doc))
-        .toList());
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => PetModel.fromFirestore(doc))
+          .where((pet) => pet.id != petId) // Filtrar aquí en memoria
+          .toList();
+    });
   }
+  Future<bool> hasExistingMatch(String fromPetId, String toPetId) async {
+    try {
+      // Buscar match en ambas direcciones
+      final query1 = await _firestore
+          .collection('matches')
+          .where('fromPetId', isEqualTo: fromPetId)
+          .where('toPetId', isEqualTo: toPetId)
+          .where('status', whereIn: ['pending', 'accepted'])
+          .get();
 
+      final query2 = await _firestore
+          .collection('matches')
+          .where('fromPetId', isEqualTo: toPetId)
+          .where('toPetId', isEqualTo: fromPetId)
+          .where('status', whereIn: ['pending', 'accepted'])
+          .get();
+
+      return query1.docs.isNotEmpty || query2.docs.isNotEmpty;
+    } catch (e) {
+      print('Error verificando match existente: $e');
+      return false;
+    }
+  }
   // Obtener matches del usuario
   Stream<List<MatchModel>> getUserMatches(String userId) {
-    return FirebaseService.matches
+    return _firestore
+        .collection('matches')
         .where('participants', arrayContains: userId)
         .orderBy('createdAt', descending: true)
         .snapshots()
@@ -61,6 +87,19 @@ class MatchRepository {
     String? message,
   }) async {
     try {
+      // Validar que no es el mismo usuario
+      if (fromUserId == toUserId) {
+        throw Exception('No puedes hacer match contigo mismo');
+      }
+
+      // Si es match de mascotas, verificar que no existe ya
+      if (fromPetId != null && toPetId != null) {
+        final existingMatch = await hasExistingMatch(fromPetId, toPetId);
+        if (existingMatch) {
+          throw Exception('Ya existe una solicitud entre estas mascotas');
+        }
+      }
+
       final matchId = _uuid.v4();
 
       MatchModel match;
@@ -87,7 +126,7 @@ class MatchRepository {
         );
       }
 
-      await FirebaseService.matches.doc(matchId).set(match.toFirestore());
+      await _firestore.collection('matches').doc(matchId).set(match.toFirestore());
       return matchId;
     } catch (e) {
       throw Exception('Error creando match: $e');
@@ -108,16 +147,63 @@ class MatchRepository {
         'updatedAt': Timestamp.now(),
       };
 
-      await FirebaseService.matches.doc(matchId).update(updates);
+      await _firestore.collection('matches').doc(matchId).update(updates);
     } catch (e) {
       throw Exception('Error respondiendo al match: $e');
+    }
+  }
+
+  Future<List<UserModel>> findPotentialUserMatches({
+    required String currentUserId,
+    int? minAge,
+    int? maxAge,
+    double? maxDistance,
+    List<String>? interests,
+  }) async {
+    try {
+      Query query = _firestore
+          .collection('users');
+      // Nota: No usar isNotEqualTo en la consulta inicial
+
+      // Obtener usuarios y filtrar en memoria para evitar problemas de índices
+      final snapshot = await query.limit(100).get();
+
+      List<UserModel> users = snapshot.docs
+          .map((doc) => UserModel.fromFirestore(doc))
+          .where((user) => user.id != currentUserId) // Filtrar usuario actual
+          .toList();
+
+      // Aplicar filtros adicionales en memoria
+      if (minAge != null) {
+        users = users.where((user) {
+          final userAge = user.age; // Usa el getter age que calcula desde dateOfBirth
+          return userAge != null && userAge >= minAge;
+        }).toList();
+      }
+
+      if (maxAge != null) {
+        users = users.where((user) {
+          final userAge = user.age; // Usa el getter age que calcula desde dateOfBirth
+          return userAge != null && userAge <= maxAge;
+        }).toList();
+      }
+
+      if (interests != null && interests.isNotEmpty) {
+        users = users.where((user) {
+          return user.interests.any((interest) => interests.contains(interest));
+        }).toList();
+      }
+
+      return users.take(50).toList(); // Limitar resultado final
+    } catch (e) {
+      throw Exception('Error buscando usuarios para match: $e');
     }
   }
 
   // Cancelar match
   Future<void> cancelMatch(String matchId) async {
     try {
-      await FirebaseService.matches.doc(matchId).update({
+      await _firestore.collection('matches').doc(matchId).update({
         'status': 'cancelled',
         'updatedAt': Timestamp.now(),
       });
@@ -186,31 +272,5 @@ class MatchRepository {
     }
   }
 
-// Buscar usuarios potenciales para match
-  Future<List<UserModel>> findPotentialUserMatches({
-    required String currentUserId,
-    int? minAge,
-    int? maxAge,
-    double? maxDistance,
-    List<String>? interests,
-  }) async {
-    try {
-      Query query = FirebaseService.users
-          .where('id', isNotEqualTo: currentUserId)
-          .where('isOpenToMeetPetOwners', isEqualTo: true);
 
-      // Filtros adicionales basados en preferencias
-      if (interests != null && interests.isNotEmpty) {
-        query = query.where('interests', arrayContainsAny: interests);
-      }
-
-      final snapshot = await query.limit(50).get();
-
-      return snapshot.docs
-          .map((doc) => UserModel.fromFirestore(doc))
-          .toList();
-    } catch (e) {
-      throw Exception('Error buscando usuarios para match: $e');
-    }
-  }
 }

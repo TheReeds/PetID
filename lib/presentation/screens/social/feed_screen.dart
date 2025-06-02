@@ -8,7 +8,8 @@ import '../../providers/auth_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/chat_provider.dart'; // Nuevo import
 import '../../../data/models/post_model.dart';
-import '../chat/chat_screen.dart'; // Nuevo import
+import '../chat/chat_screen.dart';
+import 'comments_screen.dart'; // Nuevo import
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
@@ -1196,8 +1197,10 @@ class _FeedScreenState extends State<FeedScreen> with TickerProviderStateMixin {
   }
 
   void _showComments(PostModel post) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Comentarios próximamente')),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => CommentsScreen(post: post),
+      ),
     );
   }
 
