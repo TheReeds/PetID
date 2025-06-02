@@ -1,5 +1,6 @@
 import 'package:apppetid/presentation/providers/auth_provider.dart';
 import 'package:apppetid/presentation/screens/auth/register_screen.dart';
+import 'package:apppetid/presentation/screens/home/add_first_pet_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -25,6 +26,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   late Animation<double> _fadeAnimation;
   late Animation<double> _slideAnimation;
   late Animation<double> _logoAnimation;
+  late AnimationController _logoAnimController;
+  late Animation<double> _logoScaleAnim;
 
   @override
   void initState() {
@@ -50,6 +53,14 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       CurvedAnimation(parent: _logoAnimationController, curve: Curves.elasticOut),
     );
 
+    _logoAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    _logoScaleAnim = Tween<double>(begin: 1.0, end: 1.15).animate(
+      CurvedAnimation(parent: _logoAnimController, curve: Curves.elasticOut),
+    );
+
     _logoAnimationController.forward();
     Future.delayed(const Duration(milliseconds: 300), () {
       _animationController.forward();
@@ -60,6 +71,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   void dispose() {
     _animationController.dispose();
     _logoAnimationController.dispose();
+    _logoAnimController.dispose();
     nameController.dispose();
     emailController.dispose();
     passwordController.dispose();
@@ -184,114 +196,133 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     );
   }
 
+  void _onToggleRegister() {
+    setState(() {
+      isLogin = false;
+      nameController.clear();
+      emailController.clear();
+      passwordController.clear();
+      errorText = null;
+    });
+    Provider.of<AuthProvider>(context, listen: false).clearError();
+    _logoAnimController.forward(from: 0);
+  }
+
+  void _onToggleLogin() {
+    setState(() {
+      isLogin = true;
+      nameController.clear();
+      emailController.clear();
+      passwordController.clear();
+      errorText = null;
+    });
+    Provider.of<AuthProvider>(context, listen: false).clearError();
+    _logoAnimController.forward(from: 0);
+  }
+
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        systemOverlayStyle: SystemUiOverlayStyle.dark,
-      ),
-      body: SafeArea(
-        child: authProvider.isAuthenticated
-            ? _buildAuthenticatedView(authProvider)
-            : _buildLoginView(authProvider),
-      ),
+      body: authProvider.isAuthenticated
+          ? _buildAuthenticatedView(authProvider)
+          : _buildLoginView(authProvider),
     );
   }
 
   Widget _buildAuthenticatedView(AuthProvider authProvider) {
-    return Center(
-      child: FadeTransition(
-        opacity: _fadeAnimation,
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ScaleTransition(
-                scale: _logoAnimation,
-                child: Container(
-                  width: 120,
-                  height: 120,
+    return SafeArea(
+      child: Center(
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ScaleTransition(
+                  scale: _logoAnimation,
+                  child: Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4A7AA7),
+                      borderRadius: BorderRadius.circular(30),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF4A7AA7).withOpacity(0.4),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.pets,
+                      size: 60,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 32),
+                const Text(
+                  'PetID',
+                  style: TextStyle(
+                    fontSize: 36,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF4A7AA7),
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 48),
+                Container(
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF4A7AA7),
-                    borderRadius: BorderRadius.circular(30),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF4A7AA7).withOpacity(0.4),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                        spreadRadius: 2,
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 15,
+                        offset: const Offset(0, 5),
                       ),
                     ],
                   ),
-                  child: const Icon(
-                    Icons.pets,
-                    size: 60,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 32),
-              const Text(
-                'PetID',
-                style: TextStyle(
-                  fontSize: 36,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF4A7AA7),
-                  letterSpacing: 1.2,
-                ),
-              ),
-              const SizedBox(height: 48),
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 15,
-                      offset: const Offset(0, 5),
+                  child: Text(
+                    'Bienvenido, ${authProvider.currentUser?.displayName ?? 'Usuario'}!',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      color: Color(0xFF333333),
+                      fontWeight: FontWeight.w500,
                     ),
-                  ],
-                ),
-                child: Text(
-                  'Bienvenido, ${authProvider.currentUser?.displayName ?? 'Usuario'}!',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    color: Color(0xFF333333),
-                    fontWeight: FontWeight.w500,
+                    textAlign: TextAlign.center,
                   ),
-                  textAlign: TextAlign.center,
                 ),
-              ),
-              const SizedBox(height: 40),
-              _buildButton(
-                text: 'Ir al inicio',
-                onPressed: () {
-                  Navigator.of(context).pushReplacementNamed('/home');
-                },
-                isPrimary: true,
-                icon: Icons.home_rounded,
-                isLoading: false,
-              ),
-              const SizedBox(height: 16),
-              _buildButton(
-                text: 'Cerrar sesión',
-                onPressed: () async {
-                  await authProvider.signOut();
-                  _showSnackBar('Sesión cerrada exitosamente');
-                },
-                isPrimary: false,
-                icon: Icons.logout_rounded,
-                isLoading: authProvider.isLoading,
-              ),
-            ],
+                const SizedBox(height: 40),
+                _buildButton(
+                  text: 'Ir al inicio',
+                  onPressed: () {
+                    Navigator.of(context).pushReplacementNamed('/home');
+                  },
+                  isPrimary: true,
+                  icon: Icons.home_rounded,
+                  isLoading: false,
+                ),
+                const SizedBox(height: 16),
+                _buildButton(
+                  text: 'Cerrar sesión',
+                  onPressed: () async {
+                    await authProvider.signOut();
+                    _showSnackBar('Sesión cerrada exitosamente');
+                  },
+                  isPrimary: false,
+                  icon: Icons.logout_rounded,
+                  isLoading: authProvider.isLoading,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -299,306 +330,280 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   }
 
   Widget _buildLoginView(AuthProvider authProvider) {
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              const SizedBox(height: 20),
-
-              // Logo animado
-              ScaleTransition(
-                scale: _logoAnimation,
-                child: Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF4A7AA7),
-                    borderRadius: BorderRadius.circular(25),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF4A7AA7).withOpacity(0.3),
-                        blurRadius: 15,
-                        offset: const Offset(0, 8),
-                        spreadRadius: 2,
+    return Scaffold(
+      body: Stack(
+        children: [
+          // Fondo de pantalla que ocupa TODA la pantalla, incluyendo status bar
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/1pet_collage_bg.jpg',
+              fit: BoxFit.cover,
+              alignment: Alignment.center,
+            ),
+          ),
+          // Overlay semitransparente para mejorar legibilidad
+          Positioned.fill(
+            child: Container(
+              color: Colors.black.withOpacity(0.5),
+            ),
+          ),
+          // Contenido principal
+          SafeArea(
+            child: Column(
+              children: [
+                // Header estático (Logo y títulos)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 40),
+                      // Logo
+                      ScaleTransition(
+                        scale: _logoAnimation,
+                        child: Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF4A7AA7),
+                            borderRadius: BorderRadius.circular(40),
+                          ),
+                          child: const Icon(
+                            Icons.pets,
+                            color: Colors.white,
+                            size: 40,
+                          ),
+                        ),
                       ),
+                      const SizedBox(height: 20),
+                      // Título principal
+                      FadeTransition(
+                        opacity: _fadeAnimation,
+                        child: AnimatedBuilder(
+                          animation: _slideAnimation,
+                          builder: (context, child) {
+                            return Transform.translate(
+                              offset: Offset(0, _slideAnimation.value),
+                              child: const Text(
+                                '¡Hola, Omar!',
+                                style: TextStyle(
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // Subtítulo
+                      FadeTransition(
+                        opacity: _fadeAnimation,
+                        child: const Text(
+                          'Bienvenido a PetID',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.white70,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 40),
                     ],
                   ),
-                  child: const Icon(
-                    Icons.pets,
-                    size: 50,
-                    color: Colors.white,
-                  ),
                 ),
-              ),
 
-              const SizedBox(height: 20),
-
-              // Título con animación
-              AnimatedBuilder(
-                animation: _animationController,
-                builder: (context, child) {
-                  return Transform.translate(
-                    offset: Offset(0, _slideAnimation.value),
-                    child: FadeTransition(
-                      opacity: _fadeAnimation,
-                      child: Text(
-                        isLogin ? 'Iniciar sesión' : 'Crear cuenta',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF4A7AA7),
-                          height: 1.2,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-
-              const SizedBox(height: 8),
-
-              AnimatedBuilder(
-                animation: _animationController,
-                builder: (context, child) {
-                  return Transform.translate(
-                    offset: Offset(0, _slideAnimation.value),
-                    child: FadeTransition(
-                      opacity: _fadeAnimation,
-                      child: Text(
-                        isLogin
-                            ? 'Ingresa tus credenciales para continuar'
-                            : 'Completa la información para registrarte',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey[600],
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-
-              const SizedBox(height: 40),
-
-              // Formulario con animación
-              AnimatedBuilder(
-                animation: _animationController,
-                builder: (context, child) {
-                  return Transform.translate(
-                    offset: Offset(0, _slideAnimation.value * 2),
+                // Card scrollable con el mismo tamaño que RegisterScreen
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 40),
                     child: FadeTransition(
                       opacity: _fadeAnimation,
                       child: Container(
-                        padding: const EdgeInsets.all(28),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(25),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.08),
-                              blurRadius: 25,
-                              offset: const Offset(0, 15),
-                              spreadRadius: -5,
-                            ),
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.04),
-                              blurRadius: 10,
-                              offset: const Offset(0, 5),
-                            ),
-                          ],
+                          borderRadius: BorderRadius.circular(24),
                         ),
                         child: Column(
                           children: [
-                            // Campo de nombre (solo para registro)
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 400),
-                              curve: Curves.easeInOut,
-                              height: isLogin ? 0 : 80,
-                              child: AnimatedOpacity(
-                                duration: const Duration(milliseconds: 300),
-                                opacity: isLogin ? 0 : 1,
-                                child: !isLogin ? _buildTextField(
-                                  controller: nameController,
-                                  label: 'Nombre completo',
-                                  icon: Icons.person_outline_rounded,
-                                  prefixText: '👤',
-                                ) : const SizedBox.shrink(),
-                              ),
-                            ),
-
-                            // Campo de email
-                            _buildTextField(
-                              controller: emailController,
-                              label: 'Correo electrónico',
-                              icon: Icons.email_outlined,
-                              keyboardType: TextInputType.emailAddress,
-                              prefixText: '📧',
-                            ),
-                            const SizedBox(height: 20),
-
-                            // Campo de contraseña
-                            _buildTextField(
-                              controller: passwordController,
-                              label: 'Contraseña',
-                              icon: Icons.lock_outline_rounded,
-                              obscureText: !isPasswordVisible,
-                              prefixText: '🔒',
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  isPasswordVisible
-                                      ? Icons.visibility_off_outlined
-                                      : Icons.visibility_outlined,
-                                  color: const Color(0xFF4A7AA7),
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    isPasswordVisible = !isPasswordVisible;
-                                  });
-                                },
-                              ),
-                            ),
-
-                            // Mensaje de error local
-                            if (errorText != null) ...[
-                              const SizedBox(height: 20),
-                              _buildErrorMessage(errorText!),
-                            ],
-
-                            // Mensaje de error del provider
-                            if (authProvider.errorMessage != null) ...[
-                              const SizedBox(height: 20),
-                              _buildErrorMessage(authProvider.errorMessage!),
-                            ],
-
-                            const SizedBox(height: 32),
-
-                            // Botón principal
-                            _buildButton(
-                              text: authProvider.isLoading
-                                  ? (isLogin ? 'Iniciando sesión...' : 'Registrando...')
-                                  : (isLogin ? 'Iniciar sesión' : 'Registrarse'),
-                              onPressed: authProvider.isLoading ? () {} : _handleSubmit,
-                              isPrimary: true,
-                              icon: isLogin ? Icons.login_rounded : Icons.person_add_rounded,
-                              isLoading: authProvider.isLoading,
-                            ),
-
-                            const SizedBox(height: 24),
-
-                            // Separador elegante
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Container(
-                                    height: 1,
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          Colors.transparent,
-                                          Colors.grey.withOpacity(0.4),
-                                          Colors.transparent,
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                Container(
-                                  margin: const EdgeInsets.symmetric(horizontal: 20),
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF8F9FA),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    'O',
+                            // Header del card (fijo)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+                              child: Column(
+                                children: [
+                                  const Text(
+                                    'Iniciar Sesión',
                                     style: TextStyle(
-                                      color: Colors.grey[600],
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF2C2C2C),
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'Accede a tu cuenta para gestionar tus mascotas',
+                                    style: TextStyle(
                                       fontSize: 14,
-                                      fontWeight: FontWeight.w500,
+                                      color: Colors.grey,
                                     ),
+                                    textAlign: TextAlign.center,
                                   ),
-                                ),
-                                Expanded(
-                                  child: Container(
-                                    height: 1,
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          Colors.transparent,
-                                          Colors.grey.withOpacity(0.4),
-                                          Colors.transparent,
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
 
-                            const SizedBox(height: 24),
+                            // Contenido scrollable
+                            Expanded(
+                              child: SingleChildScrollView(
+                                padding: const EdgeInsets.all(24),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const SizedBox(height: 24),
 
-                            // Botón de Google mejorado
-                            _buildGoogleButton(authProvider),
-
-                            const SizedBox(height: 24),
-
-                            // Botones de navegación
-                            if (isLogin) ...[
-                              // Registro completo
-                              _buildSecondaryButton(
-                                text: 'Crear cuenta completa',
-                                onPressed: _navigateToRegister,
-                                icon: Icons.person_add_alt_rounded,
-                              ),
-                              const SizedBox(height: 16),
-                            ],
-
-                            // Link "¿No tienes cuenta?" / "¿Ya tienes cuenta?"
-                            GestureDetector(
-                              onTap: () {
-                                HapticFeedback.lightImpact();
-                                setState(() {
-                                  isLogin = !isLogin;
-                                  nameController.clear();
-                                  emailController.clear();
-                                  passwordController.clear();
-                                  errorText = null;
-                                });
-                                // Limpiar errores del provider
-                                Provider.of<AuthProvider>(context, listen: false).clearError();
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 8),
-                                child: RichText(
-                                  text: TextSpan(
-                                    style: TextStyle(
-                                      color: Colors.grey[600],
-                                      fontSize: 15,
-                                    ),
-                                    children: [
-                                      TextSpan(
-                                        text: isLogin
-                                            ? '¿No tienes cuenta? '
-                                            : '¿Ya tienes cuenta? ',
+                                    // Email
+                                    const Text(
+                                      'Email',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                        color: Color(0xFF2C2C2C),
                                       ),
-                                      TextSpan(
-                                        text: isLogin ? 'Registrarse' : 'Iniciar sesión',
-                                        style: const TextStyle(
-                                          color: Color(0xFF4A7AA7),
-                                          fontWeight: FontWeight.w600,
-                                          decoration: TextDecoration.underline,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    _buildTextField(
+                                      controller: emailController,
+                                      hintText: 'Ingresa tu email',
+                                    ),
+                                    const SizedBox(height: 16),
+
+                                    // Password
+                                    const Text(
+                                      'Password',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                        color: Color(0xFF2C2C2C),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    _buildTextField(
+                                      controller: passwordController,
+                                      hintText: 'Ingresa tu contraseña',
+                                      isPassword: true,
+                                      obscureText: !isPasswordVisible,
+                                      onSuffixTap: () {
+                                        setState(() {
+                                          isPasswordVisible = !isPasswordVisible;
+                                        });
+                                      },
+                                    ),
+
+                                    // Mostrar error si existe
+                                    if (errorText != null) ...[
+                                      const SizedBox(height: 16),
+                                      Container(
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: Colors.red.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(color: Colors.red.withOpacity(0.3)),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.error_outline,
+                                              color: Colors.red[400],
+                                              size: 20,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                errorText!,
+                                                style: TextStyle(
+                                                  color: Colors.red[600],
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ],
-                                  ),
+
+                                    const SizedBox(height: 24),
+
+                                    // Botón Iniciar Sesión
+                                    SizedBox(
+                                      width: double.infinity,
+                                      height: 50,
+                                      child: ElevatedButton(
+                                        onPressed: authProvider.isLoading ? null : _handleSubmit,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFF4A7AA7),
+                                          foregroundColor: Colors.white,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          elevation: 0,
+                                        ),
+                                        child: authProvider.isLoading
+                                            ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                          ),
+                                        )
+                                            : const Text(
+                                          'Iniciar Sesión',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+
+                                    const SizedBox(height: 16),
+
+                                    // Botón Google
+                                    _buildGoogleButton(authProvider),
+
+                                    const SizedBox(height: 24),
+
+                                    // Enlaces inferiores
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        GestureDetector(
+                                          onTap: () {
+                                            // Lógica de olvido de contraseña
+                                          },
+                                          child: const Text(
+                                            '¿Olvidaste tu contraseña?',
+                                            style: TextStyle(
+                                              color: Color(0xFF4A7AA7),
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ),
+                                        GestureDetector(
+                                          onTap: _navigateToRegister,
+                                          child: const Text(
+                                            'Crear cuenta',
+                                            style: TextStyle(
+                                              color: Color(0xFF4A7AA7),
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
@@ -606,96 +611,121 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                         ),
                       ),
                     ),
-                  );
-                },
-              ),
-
-              const SizedBox(height: 40),
-            ],
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 
   Widget _buildTextField({
     required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    String? prefixText,
-    Widget? suffixIcon,
+    required String hintText,
+    bool isPassword = false,
     bool obscureText = false,
-    TextInputType? keyboardType,
+    VoidCallback? onSuffixTap,
   }) {
     return Container(
+      height: 50,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.grey[300]!,
+          width: 1,
+        ),
       ),
       child: TextField(
         controller: controller,
         obscureText: obscureText,
-        keyboardType: keyboardType,
         style: const TextStyle(
           fontSize: 16,
-          color: Color(0xFF333333),
-          fontWeight: FontWeight.w500,
+          color: Color(0xFF2C2C2C),
         ),
         decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: Container(
-            margin: const EdgeInsets.all(14),
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFF4A7AA7).withOpacity(0.12),
-              borderRadius: BorderRadius.circular(12),
+          hintText: hintText,
+          hintStyle: TextStyle(
+            color: Colors.grey[500],
+            fontSize: 16,
+          ),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+          suffixIcon: isPassword
+              ? IconButton(
+            icon: Icon(
+              obscureText ? Icons.visibility_off : Icons.visibility,
+              color: Colors.grey[400],
+              size: 20,
             ),
-            child: Text(
-              prefixText ?? '',
-              style: const TextStyle(fontSize: 18),
-            ),
-          ),
-          suffixIcon: suffixIcon,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(18),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(18),
-            borderSide: BorderSide(
-              color: Colors.grey.withOpacity(0.15),
-              width: 1,
-            ),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(18),
-            borderSide: const BorderSide(
-              color: Color(0xFF4A7AA7),
-              width: 2,
-            ),
-          ),
-          filled: true,
-          fillColor: const Color(0xFFFAFBFC),
-          labelStyle: TextStyle(
-            color: Colors.grey[600],
-            fontSize: 15,
-            fontWeight: FontWeight.w500,
-          ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 24,
-            vertical: 20,
-          ),
+            onPressed: onSuffixTap,
+          )
+              : null,
         ),
       ),
     );
   }
 
+  // Botón Google moderno
+  Widget _buildGoogleButton(AuthProvider authProvider) {
+    return SizedBox(
+      width: double.infinity,
+      height: 50,
+      child: OutlinedButton(
+        onPressed: authProvider.isLoading ? null : () async {
+          HapticFeedback.lightImpact();
+          final success = await authProvider.signInWithGoogle();
+          if (success) {
+            _showSnackBar('¡Bienvenido!');
+            if (mounted) {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (context) => const AddFirstPetScreen(),
+                ),
+              );
+            }
+          } else if (authProvider.errorMessage != null) {
+            _showSnackBar(authProvider.errorMessage!, isError: true);
+          }
+        },
+        style: OutlinedButton.styleFrom(
+          backgroundColor: Colors.white,
+          side: BorderSide(color: Colors.grey[300]!),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Image.asset(
+              'assets/images/google_logo.png',
+              width: 20,
+              height: 20,
+              errorBuilder: (context, error, stackTrace) => const Icon(
+                Icons.g_mobiledata,
+                color: Colors.red,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Text(
+              'Continuar con Google',
+              style: TextStyle(
+                color: Color(0xFF2C2C2C),
+                fontWeight: FontWeight.w600,
+                fontSize: 15,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Botón moderno para la vista autenticada
   Widget _buildButton({
     required String text,
     required VoidCallback onPressed,
@@ -703,154 +733,23 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     IconData? icon,
     bool isLoading = false,
   }) {
-    return Container(
+    return SizedBox(
+      height: 54,
       width: double.infinity,
-      height: 56,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: isPrimary ? [
-          BoxShadow(
-            color: const Color(0xFF4A7AA7).withOpacity(0.4),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-            spreadRadius: 2,
-          ),
-        ] : null,
-        border: !isPrimary ? Border.all(
-          color: const Color(0xFF4A7AA7).withOpacity(0.3),
-          width: 1.5,
-        ) : null,
-      ),
       child: ElevatedButton(
-        onPressed: onPressed,
+        onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: isPrimary ? const Color(0xFF4A7AA7) : Colors.white,
           foregroundColor: isPrimary ? Colors.white : const Color(0xFF4A7AA7),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(16),
+            side: isPrimary
+                ? BorderSide.none
+                : const BorderSide(color: Color(0xFF4A7AA7), width: 1.2),
           ),
-          elevation: 0,
+          elevation: isPrimary ? 2 : 0,
         ),
         child: isLoading
-            ? SizedBox(
-          width: 24,
-          height: 24,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation<Color>(
-              isPrimary ? Colors.white : const Color(0xFF4A7AA7),
-            ),
-          ),
-        )
-            : Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (icon != null) ...[
-              Icon(icon, size: 20),
-              const SizedBox(width: 8),
-            ],
-            Text(
-              text,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSecondaryButton({
-    required String text,
-    required VoidCallback onPressed,
-    IconData? icon,
-  }) {
-    return Container(
-      width: double.infinity,
-      height: 56,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: const Color(0xFF4A7AA7).withOpacity(0.3),
-          width: 1.5,
-        ),
-      ),
-      child: TextButton(
-        onPressed: () {
-          HapticFeedback.lightImpact();
-          onPressed();
-        },
-        style: TextButton.styleFrom(
-          backgroundColor: Colors.white,
-          foregroundColor: const Color(0xFF4A7AA7),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (icon != null) ...[
-              Icon(icon, size: 20),
-              const SizedBox(width: 8),
-            ],
-            Text(
-              text,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGoogleButton(AuthProvider authProvider) {
-    return Container(
-      width: double.infinity,
-      height: 56,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.grey.withOpacity(0.25),
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 15,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: TextButton(
-        onPressed: authProvider.isLoading
-            ? null
-            : () async {
-          HapticFeedback.lightImpact();
-
-          final success = await authProvider.signInWithGoogle();
-          if (success) {
-            _showSnackBar('¡Bienvenido!');
-            // El Consumer en main.dart manejará la navegación automáticamente
-          } else if (authProvider.errorMessage != null) {
-            _showSnackBar(authProvider.errorMessage!, isError: true);
-          }
-        },
-        style: TextButton.styleFrom(
-          backgroundColor: Colors.white,
-          foregroundColor: const Color(0xFF333333),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
-        ),
-        child: authProvider.isLoading
             ? const SizedBox(
           width: 24,
           height: 24,
@@ -861,51 +760,18 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         )
             : Row(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 24,
-              height: 24,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(6),
-                color: Colors.white,
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: Image.asset(
-                  'assets/images/google_logo.png', // Necesitarás agregar este asset
-                  width: 24,
-                  height: 24,
-                  errorBuilder: (context, error, stackTrace) {
-                    // Fallback si no tienes la imagen
-                    return Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(6),
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF4285F4), Color(0xFF34A853)],
-                        ),
-                      ),
-                      child: const Center(
-                        child: Text(
-                          'G',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Text(
-              'Continuar con Google',
+            if (icon != null) ...[
+              Icon(icon, size: 20),
+              const SizedBox(width: 8),
+            ],
+            Text(
+              text,
               style: TextStyle(
                 fontSize: 16,
-                fontWeight: FontWeight.w500,
-                letterSpacing: 0.3,
+                fontWeight: FontWeight.w600,
+                color: isPrimary ? Colors.white : const Color(0xFF4A7AA7),
               ),
             ),
           ],
@@ -913,46 +779,20 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       ),
     );
   }
+}
 
-  Widget _buildErrorMessage(String message) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.red.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.red.withOpacity(0.25),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.red.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              Icons.error_outline_rounded,
-              color: Colors.red[700],
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              message,
-              style: TextStyle(
-                color: Colors.red[700],
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+class _SmilePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFF4A7AA7)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round;
+    final rect = Rect.fromLTWH(0, 0, size.width, size.height);
+    canvas.drawArc(rect, 0.15, 2.85, false, paint);
   }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

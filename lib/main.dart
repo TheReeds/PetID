@@ -15,6 +15,7 @@ import 'package:apppetid/presentation/screens/social/profile_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'firebase_options.dart';
 
@@ -53,6 +54,15 @@ class MyApp extends StatelessWidget {
           elevation: 0,
         ),
       ),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('es', 'ES'),
+        Locale('en', 'US'),
+      ],
       // Usar Consumer para manejar el estado de autenticación
       home: Consumer2<AuthProvider, PetProvider>(
         builder: (context, authProvider, petProvider, child) {

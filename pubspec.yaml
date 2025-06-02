@@ -10,6 +10,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
   cupertino_icons: ^1.0.8
 
@@ -61,3 +63,5 @@ flutter:
     - assets/images/
     - assets/models/
     - assets/icons/
+    - assets/images/happy_pet_bg.jpg
+    - assets/images/pet_collage_bg.jpg
