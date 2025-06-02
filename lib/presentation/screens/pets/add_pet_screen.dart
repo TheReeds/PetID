@@ -1,4 +1,4 @@
-// lib/presentation/screens/add_pet_screen.dart
+// lib/presentation/screens/add_pet_screen.dart - ACTUALIZADO
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,7 +10,12 @@ import '../../providers/auth_provider.dart';
 import '../../providers/pet_provider.dart';
 
 class AddPetScreen extends StatefulWidget {
-  const AddPetScreen({super.key});
+  final PetModel? petToEdit; // NUEVO: Para editar mascotas existentes
+
+  const AddPetScreen({
+    super.key,
+    this.petToEdit, // NUEVO: Parámetro opcional para edición
+  });
 
   @override
   State<AddPetScreen> createState() => _AddPetScreenState();
@@ -31,12 +36,20 @@ class _AddPetScreenState extends State<AddPetScreen> with TickerProviderStateMix
   PetSize? _selectedSize;
   DateTime? _selectedBirthDate;
   List<File> _selectedImages = [];
+  List<String> _existingImages = []; // NUEVO: Para fotos existentes en edición
   bool _isForAdoption = false;
   bool _isForMating = false;
+  bool _isVaccinated = false; // NUEVO
+  bool _isNeutered = false; // NUEVO
+  bool _isMicrochipped = false; // NUEVO
+  String? _microchipId; // NUEVO
 
   final ImagePicker _picker = ImagePicker();
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+
+  // NUEVO: Determinar si estamos editando
+  bool get _isEditing => widget.petToEdit != null;
 
   @override
   void initState() {
@@ -49,6 +62,31 @@ class _AddPetScreenState extends State<AddPetScreen> with TickerProviderStateMix
       CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
     );
     _animationController.forward();
+
+    // NUEVO: Cargar datos si estamos editando
+    if (_isEditing) {
+      _loadPetData();
+    }
+  }
+
+  // NUEVO: Cargar datos de la mascota para edición
+  void _loadPetData() {
+    final pet = widget.petToEdit!;
+    _nameController.text = pet.name;
+    _breedController.text = pet.breed;
+    _weightController.text = pet.weight.toString();
+    _descriptionController.text = pet.description;
+    _selectedType = pet.type;
+    _selectedSex = pet.sex;
+    _selectedSize = pet.size;
+    _selectedBirthDate = pet.birthDate;
+    _isForAdoption = pet.isForAdoption;
+    _isForMating = pet.isForMating;
+    _isVaccinated = pet.isVaccinated;
+    _isNeutered = pet.isNeutered;
+    _isMicrochipped = pet.isMicrochipped;
+    _microchipId = pet.microchipId;
+    _existingImages = List.from(pet.photos);
   }
 
   @override
@@ -66,9 +104,9 @@ class _AddPetScreenState extends State<AddPetScreen> with TickerProviderStateMix
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-        title: const Text(
-          'Agregar Mascota',
-          style: TextStyle(
+        title: Text(
+          _isEditing ? 'Editar Mascota' : 'Agregar Mascota',
+          style: const TextStyle(
             fontWeight: FontWeight.bold,
             color: Color(0xFF4A7AA7),
           ),
@@ -94,6 +132,8 @@ class _AddPetScreenState extends State<AddPetScreen> with TickerProviderStateMix
                 _buildBasicInfo(),
                 const SizedBox(height: 24),
                 _buildPhysicalInfo(),
+                const SizedBox(height: 24),
+                _buildHealthInfo(), // NUEVO: Sección de salud
                 const SizedBox(height: 24),
                 _buildAdditionalInfo(),
                 const SizedBox(height: 24),
@@ -144,7 +184,7 @@ class _AddPetScreenState extends State<AddPetScreen> with TickerProviderStateMix
           ),
           const SizedBox(height: 16),
 
-          // Grid de fotos
+          // Grid de fotos mejorado
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -156,11 +196,20 @@ class _AddPetScreenState extends State<AddPetScreen> with TickerProviderStateMix
             ),
             itemCount: 5,
             itemBuilder: (context, index) {
-              if (index < _selectedImages.length) {
-                return _buildImageTile(_selectedImages[index], index);
-              } else if (index == _selectedImages.length && _selectedImages.length < 5) {
+              final totalImages = _existingImages.length + _selectedImages.length;
+
+              if (index < _existingImages.length) {
+                // Mostrar imagen existente
+                return _buildExistingImageTile(_existingImages[index], index);
+              } else if (index < totalImages) {
+                // Mostrar nueva imagen seleccionada
+                final newImageIndex = index - _existingImages.length;
+                return _buildImageTile(_selectedImages[newImageIndex], index, isNew: true);
+              } else if (totalImages < 5 && index == totalImages) {
+                // Mostrar botón para agregar
                 return _buildAddImageTile();
               } else {
+                // Slot vacío
                 return _buildEmptyImageTile();
               }
             },
@@ -170,7 +219,8 @@ class _AddPetScreenState extends State<AddPetScreen> with TickerProviderStateMix
     );
   }
 
-  Widget _buildImageTile(File image, int index) {
+  // NUEVO: Widget para imagen existente
+  Widget _buildExistingImageTile(String imageUrl, int index) {
     return Stack(
       children: [
         Container(
@@ -180,11 +230,15 @@ class _AddPetScreenState extends State<AddPetScreen> with TickerProviderStateMix
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(10),
-            child: Image.file(
-              image,
+            child: Image.network(
+              imageUrl,
               fit: BoxFit.cover,
               width: double.infinity,
               height: double.infinity,
+              errorBuilder: (context, error, stackTrace) => Container(
+                color: Colors.grey.shade200,
+                child: const Icon(Icons.error, color: Colors.grey),
+              ),
             ),
           ),
         ),
@@ -192,7 +246,7 @@ class _AddPetScreenState extends State<AddPetScreen> with TickerProviderStateMix
           top: 4,
           right: 4,
           child: GestureDetector(
-            onTap: () => _removeImage(index),
+            onTap: () => _removeExistingImage(index),
             child: Container(
               padding: const EdgeInsets.all(4),
               decoration: const BoxDecoration(
@@ -219,6 +273,70 @@ class _AddPetScreenState extends State<AddPetScreen> with TickerProviderStateMix
               ),
               child: const Text(
                 'Principal',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildImageTile(File image, int index, {bool isNew = false}) {
+    return Stack(
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isNew ? Colors.green : const Color(0xFF4A7AA7),
+              width: 2,
+            ),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.file(
+              image,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+            ),
+          ),
+        ),
+        Positioned(
+          top: 4,
+          right: 4,
+          child: GestureDetector(
+            onTap: () => _removeNewImage(index - _existingImages.length),
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: const BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.close,
+                color: Colors.white,
+                size: 16,
+              ),
+            ),
+          ),
+        ),
+        if (isNew)
+          Positioned(
+            bottom: 4,
+            left: 4,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.green,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                'Nueva',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 10,
@@ -364,6 +482,42 @@ class _AddPetScreenState extends State<AddPetScreen> with TickerProviderStateMix
     );
   }
 
+  // NUEVO: Sección de información de salud
+  Widget _buildHealthInfo() {
+    return _buildSection(
+      'Información de Salud',
+      [
+        _buildSwitchTile(
+          'Vacunado',
+          'La mascota tiene sus vacunas al día',
+          _isVaccinated,
+              (value) => setState(() => _isVaccinated = value),
+        ),
+        _buildSwitchTile(
+          'Esterilizado/Castrado',
+          'La mascota ha sido esterilizada o castrada',
+          _isNeutered,
+              (value) => setState(() => _isNeutered = value),
+        ),
+        _buildSwitchTile(
+          'Microchip',
+          'La mascota tiene microchip de identificación',
+          _isMicrochipped,
+              (value) => setState(() => _isMicrochipped = value),
+        ),
+        if (_isMicrochipped) ...[
+          const SizedBox(height: 16),
+          _buildTextField(
+            controller: TextEditingController(text: _microchipId ?? ''),
+            label: 'ID del Microchip',
+            icon: Icons.memory,
+            onChanged: (value) => _microchipId = value,
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _buildAdditionalInfo() {
     return _buildSection(
       'Información Adicional',
@@ -440,12 +594,14 @@ class _AddPetScreenState extends State<AddPetScreen> with TickerProviderStateMix
     String? hint,
     TextInputType? keyboardType,
     String? Function(String?)? validator,
+    void Function(String)? onChanged,
   }) {
     return TextFormField(
       controller: controller,
       maxLines: maxLines,
       keyboardType: keyboardType,
       validator: validator,
+      onChanged: onChanged,
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
@@ -617,14 +773,14 @@ class _AddPetScreenState extends State<AddPetScreen> with TickerProviderStateMix
               color: Colors.white,
               strokeWidth: 2,
             )
-                : const Row(
+                : Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.save, size: 20),
-                SizedBox(width: 8),
+                Icon(_isEditing ? Icons.save : Icons.add, size: 20),
+                const SizedBox(width: 8),
                 Text(
-                  'Guardar Mascota',
-                  style: TextStyle(
+                  _isEditing ? 'Actualizar Mascota' : 'Guardar Mascota',
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                   ),
@@ -638,7 +794,8 @@ class _AddPetScreenState extends State<AddPetScreen> with TickerProviderStateMix
   }
 
   Future<void> _pickImage() async {
-    if (_selectedImages.length >= 5) {
+    final totalImages = _existingImages.length + _selectedImages.length;
+    if (totalImages >= 5) {
       _showSnackBar('Máximo 5 fotos permitidas', isError: true);
       return;
     }
@@ -661,9 +818,16 @@ class _AddPetScreenState extends State<AddPetScreen> with TickerProviderStateMix
     }
   }
 
-  void _removeImage(int index) {
+  void _removeNewImage(int index) {
     setState(() {
       _selectedImages.removeAt(index);
+    });
+  }
+
+  // NUEVO: Remover imagen existente
+  void _removeExistingImage(int index) {
+    setState(() {
+      _existingImages.removeAt(index);
     });
   }
 
@@ -707,7 +871,8 @@ class _AddPetScreenState extends State<AddPetScreen> with TickerProviderStateMix
       return;
     }
 
-    if (_selectedImages.isEmpty) {
+    final totalImages = _existingImages.length + _selectedImages.length;
+    if (totalImages == 0) {
       _showSnackBar('Por favor agrega al menos una foto', isError: true);
       return;
     }
@@ -722,34 +887,73 @@ class _AddPetScreenState extends State<AddPetScreen> with TickerProviderStateMix
       return;
     }
 
-    final pet = PetModel(
-      id: '', // Se generará automáticamente
-      name: _nameController.text.trim(),
-      type: _selectedType!,
-      breed: _breedController.text.trim(),
-      sex: _selectedSex!,
-      birthDate: _selectedBirthDate!,
-      size: _selectedSize!,
-      weight: double.parse(_weightController.text.trim()),
-      ownerId: authProvider.currentUser!.id,
-      description: _descriptionController.text.trim(),
-      isForAdoption: _isForAdoption,
-      isForMating: _isForMating,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
+    bool success;
 
-    final success = await petProvider.createPet(
-      pet: pet,
-      photoFiles: _selectedImages,
-    );
+    if (_isEditing) {
+      // Actualizar mascota existente
+      final updatedPet = widget.petToEdit!.copyWith(
+        name: _nameController.text.trim(),
+        type: _selectedType!,
+        breed: _breedController.text.trim(),
+        sex: _selectedSex!,
+        birthDate: _selectedBirthDate!,
+        size: _selectedSize!,
+        weight: double.parse(_weightController.text.trim()),
+        description: _descriptionController.text.trim(),
+        isForAdoption: _isForAdoption,
+        isForMating: _isForMating,
+        isVaccinated: _isVaccinated,
+        isNeutered: _isNeutered,
+        isMicrochipped: _isMicrochipped,
+        microchipId: _isMicrochipped ? _microchipId : null,
+        photos: _existingImages, // Mantener las fotos existentes
+        updatedAt: DateTime.now(),
+      );
+
+      success = await petProvider.updatePet(
+        pet: updatedPet,
+        newPhotoFiles: _selectedImages.isNotEmpty ? _selectedImages : null,
+      );
+    } else {
+      // Crear nueva mascota
+      final pet = PetModel(
+        id: '', // Se generará automáticamente
+        name: _nameController.text.trim(),
+        type: _selectedType!,
+        breed: _breedController.text.trim(),
+        sex: _selectedSex!,
+        birthDate: _selectedBirthDate!,
+        size: _selectedSize!,
+        weight: double.parse(_weightController.text.trim()),
+        ownerId: authProvider.currentUser!.id,
+        description: _descriptionController.text.trim(),
+        isForAdoption: _isForAdoption,
+        isForMating: _isForMating,
+        isVaccinated: _isVaccinated,
+        isNeutered: _isNeutered,
+        isMicrochipped: _isMicrochipped,
+        microchipId: _isMicrochipped ? _microchipId : null,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      success = await petProvider.createPet(
+        pet: pet,
+        photoFiles: _selectedImages,
+      );
+    }
 
     if (success) {
-      _showSnackBar('¡Mascota registrada exitosamente!');
-      Navigator.of(context).pop();
+      _showSnackBar(
+          _isEditing
+              ? '¡Mascota actualizada exitosamente!'
+              : '¡Mascota registrada exitosamente!'
+      );
+      Navigator.of(context).pop(true); // Retornar true para indicar éxito
     } else {
       _showSnackBar(
-        petProvider.errorMessage ?? 'Error al registrar mascota',
+        petProvider.errorMessage ??
+            (_isEditing ? 'Error al actualizar mascota' : 'Error al registrar mascota'),
         isError: true,
       );
     }

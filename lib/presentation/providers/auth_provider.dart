@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../data/models/user_model.dart';
 import '../../data/repositories/auth_repository.dart';
-import '../../data/services/notification_service.dart'; // AGREGADO
+import '../../data/services/notification_service.dart';
 
 enum AuthState { initial, loading, authenticated, unauthenticated, error }
 
@@ -15,6 +15,10 @@ class AuthProvider extends ChangeNotifier {
   String? _errorMessage;
   User? _firebaseUser;
 
+  // NUEVO: Cache de datos del usuario para evitar consultas innecesarias
+  DateTime? _lastUserDataRefresh;
+  static const Duration _cacheValidDuration = Duration(minutes: 5);
+
   // Getters
   AuthState get state => _state;
   UserModel? get currentUser => _currentUser;
@@ -22,6 +26,12 @@ class AuthProvider extends ChangeNotifier {
   User? get firebaseUser => _firebaseUser;
   bool get isAuthenticated => _state == AuthState.authenticated;
   bool get isLoading => _state == AuthState.loading;
+
+  // NUEVO: Verificar si los datos están actualizados
+  bool get isUserDataStale {
+    if (_lastUserDataRefresh == null) return true;
+    return DateTime.now().difference(_lastUserDataRefresh!) > _cacheValidDuration;
+  }
 
   AuthProvider() {
     _initializeAuth();
@@ -35,7 +45,6 @@ class AuthProvider extends ChangeNotifier {
       if (user != null) {
         await _loadUserData(user.uid);
 
-        // NUEVO: Configurar notificaciones después del login automático
         if (_currentUser != null) {
           await _setupNotifications();
         }
@@ -43,12 +52,13 @@ class AuthProvider extends ChangeNotifier {
         _setState(AuthState.authenticated);
       } else {
         _currentUser = null;
+        _lastUserDataRefresh = null;
         _setState(AuthState.unauthenticated);
       }
     });
   }
 
-  // Registro de usuario con datos completos
+  // MEJORADO: Registro de usuario con datos completos
   Future<bool> signUp({
     required String email,
     required String password,
@@ -59,6 +69,10 @@ class AuthProvider extends ChangeNotifier {
     DateTime? dateOfBirth,
     String? gender,
     File? profileImage,
+    List<String>? interests,
+    List<String>? languages,
+    String? lifestyle,
+    bool isOpenToMeetPetOwners = false,
   }) async {
     try {
       _setState(AuthState.loading);
@@ -74,14 +88,15 @@ class AuthProvider extends ChangeNotifier {
         dateOfBirth: dateOfBirth,
         gender: gender,
         profileImage: profileImage,
+        interests: interests,
+        languages: languages,
+        lifestyle: lifestyle,
+        isOpenToMeetPetOwners: isOpenToMeetPetOwners,
       );
 
       if (credential?.user != null) {
         await _loadUserData(credential!.user!.uid);
-
-        // NUEVO: Configurar notificaciones después del registro
         await _setupNotifications();
-
         _setState(AuthState.authenticated);
         return true;
       }
@@ -110,10 +125,7 @@ class AuthProvider extends ChangeNotifier {
 
       if (credential?.user != null) {
         await _loadUserData(credential!.user!.uid);
-
-        // NUEVO: Configurar notificaciones después del login
         await _setupNotifications();
-
         _setState(AuthState.authenticated);
         return true;
       }
@@ -136,10 +148,7 @@ class AuthProvider extends ChangeNotifier {
 
       if (credential?.user != null) {
         await _loadUserData(credential!.user!.uid);
-
-        // NUEVO: Configurar notificaciones después del login con Google
         await _setupNotifications();
-
         _setState(AuthState.authenticated);
         return true;
       }
@@ -158,12 +167,13 @@ class AuthProvider extends ChangeNotifier {
     try {
       _setState(AuthState.loading);
 
-      // NUEVO: Desuscribirse de notificaciones antes del logout
       await _teardownNotifications();
-
       await _authRepository.signOut();
+
       _currentUser = null;
       _firebaseUser = null;
+      _lastUserDataRefresh = null;
+
       _setState(AuthState.unauthenticated);
     } catch (e) {
       _setError(e.toString());
@@ -171,12 +181,25 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Actualizar perfil de usuario
+  // MEJORADO: Actualizar perfil de usuario con validación
   Future<bool> updateProfile(UserModel updatedUser) async {
     try {
       _setState(AuthState.loading);
+
+      // Validar datos antes de enviar
+      final validationError = _validateProfileData(updatedUser);
+      if (validationError != null) {
+        _setError(validationError);
+        _setState(AuthState.error);
+        return false;
+      }
+
       await _authRepository.updateUserProfile(updatedUser);
+
+      // Actualizar usuario local y cache
       _currentUser = updatedUser;
+      _lastUserDataRefresh = DateTime.now();
+
       _setState(AuthState.authenticated);
       return true;
     } catch (e) {
@@ -186,14 +209,47 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Actualizar foto de perfil
+  // NUEVO: Validar datos del perfil
+  String? _validateProfileData(UserModel user) {
+    if (user.displayName.trim().isEmpty) {
+      return 'El nombre de usuario es obligatorio';
+    }
+
+    if (user.displayName.trim().length < 3) {
+      return 'El nombre de usuario debe tener al menos 3 caracteres';
+    }
+
+    if (user.displayName.trim().length > 20) {
+      return 'El nombre de usuario no puede tener más de 20 caracteres';
+    }
+
+    if (user.phone != null && user.phone!.isNotEmpty && user.phone!.length < 9) {
+      return 'Número de teléfono inválido';
+    }
+
+    if (user.dateOfBirth != null) {
+      final age = DateTime.now().year - user.dateOfBirth!.year;
+      if (age < 13) {
+        return 'Debes tener al menos 13 años para usar la aplicación';
+      }
+      if (age > 120) {
+        return 'Fecha de nacimiento inválida';
+      }
+    }
+
+    return null;
+  }
+
+  // MEJORADO: Actualizar foto de perfil con mejor manejo
   Future<bool> updateProfilePhoto(File imageFile) async {
     try {
       _setState(AuthState.loading);
+
       await _authRepository.updateProfilePhoto(imageFile: imageFile);
 
       // Recargar datos del usuario para obtener la nueva URL
-      await _loadUserData(_firebaseUser!.uid);
+      await _forceRefreshUserData();
+
       _setState(AuthState.authenticated);
       return true;
     } catch (e) {
@@ -231,10 +287,17 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> updateEmail(String newEmail) async {
     try {
       _setState(AuthState.loading);
-      await _authRepository.updateEmail(newEmail);
 
-      // Recargar datos del usuario
-      await _loadUserData(_firebaseUser!.uid);
+      // Verificar si necesita reautenticación
+      if (_authRepository.needsReauthentication()) {
+        _setError('Por seguridad, debes iniciar sesión nuevamente para cambiar tu email');
+        _setState(AuthState.error);
+        return false;
+      }
+
+      await _authRepository.updateEmail(newEmail);
+      await _forceRefreshUserData();
+
       _setState(AuthState.authenticated);
       return true;
     } catch (e) {
@@ -248,10 +311,31 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> updatePassword(String newPassword) async {
     try {
       _clearError();
+
+      // Verificar si necesita reautenticación
+      if (_authRepository.needsReauthentication()) {
+        _setError('Por seguridad, debes iniciar sesión nuevamente para cambiar tu contraseña');
+        return false;
+      }
+
       await _authRepository.updatePassword(newPassword);
       return true;
     } catch (e) {
       _setError(e.toString());
+      return false;
+    }
+  }
+
+  // NUEVO: Reautenticar usuario
+  Future<bool> reauthenticateUser(String password) async {
+    try {
+      _setState(AuthState.loading);
+      await _authRepository.reauthenticateUser(password);
+      _setState(AuthState.authenticated);
+      return true;
+    } catch (e) {
+      _setError(e.toString());
+      _setState(AuthState.error);
       return false;
     }
   }
@@ -261,12 +345,13 @@ class AuthProvider extends ChangeNotifier {
     try {
       _setState(AuthState.loading);
 
-      // NUEVO: Desuscribirse de notificaciones antes de eliminar cuenta
       await _teardownNotifications();
-
       await _authRepository.deleteAccount();
+
       _currentUser = null;
       _firebaseUser = null;
+      _lastUserDataRefresh = null;
+
       _setState(AuthState.unauthenticated);
       return true;
     } catch (e) {
@@ -276,28 +361,45 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Recargar datos del usuario
+  // MEJORADO: Recargar datos del usuario con cache inteligente
   Future<void> refreshUserData() async {
     if (_firebaseUser != null) {
       try {
-        // Recargar usuario de Firebase Auth
-        await _firebaseUser!.reload();
-        _firebaseUser = FirebaseAuth.instance.currentUser;
-
-        // Recargar datos de Firestore
-        await _loadUserData(_firebaseUser!.uid);
-
-        // Asegurar que el estado sea authenticated
-        if (_currentUser != null) {
-          _setState(AuthState.authenticated);
+        // Solo recargar si los datos están obsoletos o se fuerza
+        if (isUserDataStale) {
+          await _forceRefreshUserData();
         }
       } catch (e) {
-        print('Error refreshing user data: $e');
+        print('❌ Error refreshing user data: $e');
       }
     }
   }
 
-  // NUEVO: Configurar notificaciones para usuario autenticado
+  // NUEVO: Forzar recarga de datos del usuario
+  Future<void> _forceRefreshUserData() async {
+    if (_firebaseUser == null) return;
+
+    try {
+      // Recargar usuario de Firebase Auth
+      await _firebaseUser!.reload();
+      _firebaseUser = FirebaseAuth.instance.currentUser;
+
+      // Recargar datos de Firestore
+      final userData = await _authRepository.refreshCurrentUserData();
+      if (userData != null) {
+        _currentUser = userData;
+        _lastUserDataRefresh = DateTime.now();
+
+        if (_state == AuthState.authenticated) {
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      print('❌ Error force refreshing user data: $e');
+    }
+  }
+
+  // Configurar notificaciones para usuario autenticado
   Future<void> _setupNotifications() async {
     if (_currentUser == null) return;
 
@@ -306,11 +408,8 @@ class AuthProvider extends ChangeNotifier {
         print('🔔 Configurando notificaciones para: ${_currentUser!.displayName}');
       }
 
-      // Suscribirse a todos los tópicos de notificaciones
       await NotificationService.subscribeToAllNotifications();
       await NotificationService.subscribeToEventNotifications();
-
-      // Guardar token FCM en Firestore
       await NotificationService.saveDeviceToken(_currentUser!.id);
 
       if (kDebugMode) {
@@ -320,22 +419,18 @@ class AuthProvider extends ChangeNotifier {
       if (kDebugMode) {
         print('❌ Error configurando notificaciones: $e');
       }
-      // No lanzar excepción para no interrumpir el flujo de autenticación
     }
   }
 
-  // NUEVO: Desconfigurar notificaciones para logout
+  // Desconfigurar notificaciones para logout
   Future<void> _teardownNotifications() async {
     try {
       if (kDebugMode) {
         print('🔕 Desonfigurando notificaciones...');
       }
 
-      // Desuscribirse de todos los tópicos
       await NotificationService.unsubscribeFromAllNotifications();
       await NotificationService.unsubscribeFromEventNotifications();
-
-      // Limpiar notificaciones locales
       await NotificationService.clearAllNotifications();
 
       if (kDebugMode) {
@@ -348,14 +443,33 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Cargar datos del usuario desde Firestore
+  // MEJORADO: Cargar datos del usuario desde Firestore
   Future<void> _loadUserData(String userId) async {
     try {
       final userData = await _authRepository.getCurrentUserData();
-      _currentUser = userData;
+      if (userData != null) {
+        _currentUser = userData;
+        _lastUserDataRefresh = DateTime.now();
+      }
     } catch (e) {
-      print('Error loading user data: $e');
+      print('❌ Error loading user data: $e');
     }
+  }
+
+  // NUEVO: Obtener información del cache
+  Map<String, dynamic> getCacheInfo() {
+    return {
+      'hasCurrentUser': _currentUser != null,
+      'lastRefresh': _lastUserDataRefresh?.toIso8601String(),
+      'isStale': isUserDataStale,
+      'cacheValidUntil': _lastUserDataRefresh?.add(_cacheValidDuration).toIso8601String(),
+    };
+  }
+
+  // NUEVO: Invalidar cache de usuario
+  void invalidateUserCache() {
+    _lastUserDataRefresh = null;
+    notifyListeners();
   }
 
   // Métodos privados de estado
@@ -380,6 +494,7 @@ class AuthProvider extends ChangeNotifier {
   bool isValidEmail(String email) {
     return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
   }
+
 
   bool isValidPassword(String password) {
     return password.length >= 6;
@@ -422,6 +537,22 @@ class AuthProvider extends ChangeNotifier {
     if (phone.trim().isEmpty) return null; // Campo opcional
     if (phone.trim().length < 9) {
       return 'Número de teléfono inválido';
+    }
+    return null;
+  }
+
+  // NUEVO: Validar intereses
+  String? validateInterests(List<String> interests) {
+    if (interests.length > 10) {
+      return 'Máximo 10 intereses permitidos';
+    }
+    return null;
+  }
+
+  // NUEVO: Validar idiomas
+  String? validateLanguages(List<String> languages) {
+    if (languages.length > 5) {
+      return 'Máximo 5 idiomas permitidos';
     }
     return null;
   }

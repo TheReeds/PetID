@@ -14,7 +14,7 @@ import '../social/post_create_screen.dart';
 import '../matches/match_screen.dart';
 import '../social/profile_screen.dart';
 import '../chat/chat_list_screen.dart';
-import '../ai/ai_hub_screen.dart'; // NUEVO IMPORT
+import '../ai/ai_hub_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -129,7 +129,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
-      appBar: _buildAppBar(), // NUEVO: AppBar con botón AI
+      appBar: _buildAppBar(),
       body: PageView(
         controller: _pageController,
         onPageChanged: (index) {
@@ -146,7 +146,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  // NUEVO: AppBar con botón de IA
+  // AppBar con botón de IA
   PreferredSizeWidget? _buildAppBar() {
     if (_currentIndex == 0 || _currentIndex == 4) {
       return AppBar(
@@ -196,7 +196,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return null;
   }
 
-
   String _getAppBarTitle() {
     switch (_currentIndex) {
       case 0:
@@ -208,7 +207,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-  // NUEVO: Abrir AI Hub
+  // Abrir AI Hub
   void _openAIHub() {
     HapticFeedback.lightImpact();
     Navigator.of(context).push(
@@ -216,6 +215,65 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         builder: (context) => const AIHubScreen(),
       ),
     );
+  }
+
+  // NUEVO: Navegar al perfil del usuario actual
+  void _navigateToProfile() {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    if (authProvider.currentUser != null) {
+      HapticFeedback.lightImpact();
+
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => const ProfileScreen(
+            isEditable: true, // Permitir edición en el perfil propio
+          ),
+        ),
+      ).then((_) {
+        // Refrescar datos después de volver del perfil
+        _refreshAfterProfileUpdate();
+      });
+    }
+  }
+
+  // NUEVO: Navegar al perfil de otro usuario
+  void _navigateToUserProfile(String userId, {String? userName}) {
+    HapticFeedback.lightImpact();
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ProfileScreen(
+          userId: userId,
+          isEditable: false, // No permitir edición en perfiles ajenos
+        ),
+      ),
+    );
+  }
+
+  // NUEVO: Refrescar datos después de actualizar perfil
+  Future<void> _refreshAfterProfileUpdate() async {
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+
+      // Refrescar datos del usuario actual
+      await authProvider.refreshUserData();
+
+      // Actualizar usuario en cache del UserProvider
+      if (authProvider.currentUser != null) {
+        userProvider.updateUserInCache(authProvider.currentUser!);
+      }
+
+      // Refrescar estadísticas del perfil si estamos en esa pestaña
+      if (_currentIndex == 5) {
+        await _loadProfileStats();
+      }
+
+      print('🔄 Datos actualizados después de editar perfil');
+    } catch (e) {
+      print('❌ Error refrescando datos: $e');
+    }
   }
 
   // Determinar si mostrar el FAB según la pestaña activa
@@ -340,6 +398,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  // MEJORADO: Actualizado para manejar mejor el perfil
   Widget _buildNavItem(int index, IconData icon, String label) {
     final isSelected = _currentIndex == index;
 
@@ -351,7 +410,52 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       size: 24,
     );
 
-    if (index == 2) { // Chats tab
+    // Perfil con foto de usuario
+    if (index == 5) {
+      iconWidget = Consumer<AuthProvider>(
+        builder: (context, authProvider, child) {
+          final user = authProvider.currentUser;
+
+          if (user?.photoURL != null) {
+            return Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected ? const Color(0xFF4A7AA7) : Colors.grey.shade400,
+                  width: 2,
+                ),
+              ),
+              child: CircleAvatar(
+                radius: 12,
+                backgroundImage: NetworkImage(user!.photoURL!),
+                backgroundColor: Colors.grey.shade200,
+              ),
+            );
+          }
+
+          return Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: isSelected ? const Color(0xFF4A7AA7) : Colors.grey.shade400,
+                width: 2,
+              ),
+            ),
+            child: Icon(
+              Icons.person_outline,
+              size: 16,
+              color: isSelected ? const Color(0xFF4A7AA7) : Colors.grey.shade400,
+            ),
+          );
+        },
+      );
+    }
+    // Chats con contador de mensajes no leídos
+    else if (index == 2) {
       iconWidget = Consumer<ChatProvider>(
         builder: (context, chatProvider, child) {
           final unreadCount = chatProvider.totalUnreadCount;
@@ -395,7 +499,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           );
         },
       );
-    } else if (index == 3) { // Matches tab
+    }
+    // Matches con indicador de solicitudes pendientes
+    else if (index == 3) {
       iconWidget = Consumer<MatchProvider>(
         builder: (context, matchProvider, child) {
           final hasPendingRequests = matchProvider.pendingMatches.isNotEmpty;
@@ -501,6 +607,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void _onTabTapped(int index) {
     HapticFeedback.lightImpact();
 
+    // NUEVO: Manejar tap en perfil de manera especial
+    if (index == 5) {
+      _navigateToProfile();
+      return;
+    }
+
     if (index != _currentIndex) {
       setState(() {
         _currentIndex = index;
@@ -540,5 +652,182 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
 
     print('🔄 Feed refrescado después de crear post');
+  }
+}
+
+// NUEVOS WIDGETS HELPER: Para usar en otros lugares de la app
+
+class UserProfileButton extends StatelessWidget {
+  final String userId;
+  final String? userName;
+  final double size;
+  final bool showBorder;
+  final VoidCallback? onTap;
+
+  const UserProfileButton({
+    super.key,
+    required this.userId,
+    this.userName,
+    this.size = 40,
+    this.showBorder = true,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<UserProvider>(
+      builder: (context, userProvider, child) {
+        final user = userProvider.getUserFromCache(userId);
+
+        return GestureDetector(
+          onTap: onTap ?? () => _navigateToUserProfile(context, userId, userName),
+          child: Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: showBorder ? Border.all(
+                color: Colors.grey.shade300,
+                width: 1,
+              ) : null,
+            ),
+            child: CircleAvatar(
+              radius: size / 2,
+              backgroundImage: user?.photoURL != null
+                  ? NetworkImage(user!.photoURL!)
+                  : null,
+              backgroundColor: Colors.grey.shade200,
+              child: user?.photoURL == null
+                  ? Icon(
+                Icons.person_outline,
+                size: size * 0.6,
+                color: Colors.grey.shade400,
+              )
+                  : null,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _navigateToUserProfile(BuildContext context, String userId, String? userName) {
+    HapticFeedback.lightImpact();
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ProfileScreen(
+          userId: userId,
+          isEditable: false,
+        ),
+      ),
+    );
+  }
+}
+
+// Widget para mostrar información rápida del usuario en cards
+class UserInfoCard extends StatelessWidget {
+  final String userId;
+  final VoidCallback? onTap;
+
+  const UserInfoCard({
+    super.key,
+    required this.userId,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<UserProvider>(
+      builder: (context, userProvider, child) {
+        final user = userProvider.getUserFromCache(userId);
+
+        if (user == null) {
+          return const SizedBox.shrink();
+        }
+
+        return GestureDetector(
+          onTap: onTap ?? () => _navigateToUserProfile(context),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 20,
+                  backgroundImage: user.photoURL != null
+                      ? NetworkImage(user.photoURL!)
+                      : null,
+                  backgroundColor: Colors.grey.shade200,
+                  child: user.photoURL == null
+                      ? Icon(
+                    Icons.person_outline,
+                    size: 20,
+                    color: Colors.grey.shade400,
+                  )
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user.displayName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: Color(0xFF2D3748),
+                        ),
+                      ),
+                      if (user.interests.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          user.interests.take(3).join(' • '),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  size: 14,
+                  color: Colors.grey.shade400,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _navigateToUserProfile(BuildContext context) {
+    HapticFeedback.lightImpact();
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ProfileScreen(
+          userId: userId,
+          isEditable: false,
+        ),
+      ),
+    );
   }
 }

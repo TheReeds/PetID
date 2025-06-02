@@ -18,20 +18,6 @@ class PetRepository {
         .toList());
   }
 
-  // Obtener una mascota por ID
-  Future<PetModel?> getPetById(String petId) async {
-    try {
-      final doc = await FirebaseService.pets.doc(petId).get();
-      if (doc.exists) {
-        return PetModel.fromFirestore(doc);
-      }
-      return null;
-    } catch (e) {
-      print('Error getting pet: $e');
-      return null;
-    }
-  }
-
   // Crear nueva mascota
   Future<String> createPet(PetModel pet) async {
     try {
@@ -158,5 +144,93 @@ class PetRepository {
       'pets': FieldValue.arrayRemove([petId]),
       'updatedAt': Timestamp.now(),
     });
+  }
+  Future<List<PetModel>> getUserPetsList(String ownerId) async {
+    try {
+      final snapshot = await FirebaseService.pets
+          .where('ownerId', isEqualTo: ownerId)
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      return snapshot.docs.map((doc) => PetModel.fromFirestore(doc)).toList();
+    } catch (e) {
+      print('❌ Error obteniendo lista de mascotas del usuario: $e');
+      throw Exception('Error obteniendo mascotas: $e');
+    }
+  }
+
+  Future<List<PetModel>> getPopularPets({int limit = 10}) async {
+    try {
+      // Obtener mascotas más recientes como "populares"
+      final snapshot = await FirebaseService.pets
+          .where('isLost', isEqualTo: false)
+          .orderBy('createdAt', descending: true)
+          .limit(limit)
+          .get();
+
+      return snapshot.docs.map((doc) => PetModel.fromFirestore(doc)).toList();
+    } catch (e) {
+      print('❌ Error obteniendo mascotas populares: $e');
+      return [];
+    }
+  }
+
+  Future<List<PetModel>> searchPublicPets({
+    String? query,
+    PetType? type,
+    PetSize? size,
+    String? location,
+    int limit = 20,
+  }) async {
+    try {
+      Query<Map<String, dynamic>> petQuery = FirebaseService.pets as Query<Map<String, dynamic>>;
+
+      // Agregar filtros según los parámetros
+      if (type != null) {
+        petQuery = petQuery.where('type', isEqualTo: type.toString().split('.').last);
+      }
+
+      if (size != null) {
+        petQuery = petQuery.where('size', isEqualTo: size.toString().split('.').last);
+      }
+
+      // Aplicar límite y ordenar
+      petQuery = petQuery
+          .orderBy('createdAt', descending: true)
+          .limit(limit);
+
+      final snapshot = await petQuery.get();
+      List<PetModel> pets = snapshot.docs.map((doc) => PetModel.fromFirestore(doc)).toList();
+
+      // Filtrar por query de texto si se proporciona
+      if (query != null && query.isNotEmpty) {
+        final lowerQuery = query.toLowerCase();
+        pets = pets.where((pet) =>
+        pet.name.toLowerCase().contains(lowerQuery) ||
+            pet.breed.toLowerCase().contains(lowerQuery) ||
+            pet.description.toLowerCase().contains(lowerQuery)
+        ).toList();
+      }
+
+      return pets;
+    } catch (e) {
+      print('❌ Error buscando mascotas públicas: $e');
+      return [];
+    }
+  }
+
+  Future<PetModel?> getPetById(String petId) async {
+    try {
+      final doc = await FirebaseService.pets.doc(petId).get();
+
+      if (doc.exists) {
+        return PetModel.fromFirestore(doc);
+      }
+
+      return null;
+    } catch (e) {
+      print('❌ Error obteniendo mascota por ID: $e');
+      return null;
+    }
   }
 }

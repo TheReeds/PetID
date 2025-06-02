@@ -31,7 +31,13 @@ android {
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug") // Cambia cuando hagas release real
+            signingConfig = signingConfigs.getByName("debug") // Usa "release" si tienes una clave real
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 }
@@ -46,4 +52,5 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:33.14.0"))
     implementation("com.google.firebase:firebase-analytics")
     implementation ("com.google.android.gms:play-services-auth:21.3.0")
+
 }

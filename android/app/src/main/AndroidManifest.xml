@@ -11,9 +11,9 @@
     <uses-feature android:name="android.hardware.location" android:required="false" />
 
     <application
-        android:label="apppetid"
+        android:label="PetID"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/launcher_icon">
         <activity
             android:name=".MainActivity"
             android:exported="true"

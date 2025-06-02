@@ -1,4 +1,5 @@
 // lib/presentation/screens/social/feed_screen.dart
+import 'package:apppetid/presentation/screens/social/profile_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -685,9 +686,19 @@ class _FeedScreenState extends State<FeedScreen> with TickerProviderStateMixin {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final currentUserId = authProvider.currentUser?.id ?? '';
 
-    // No mostrar opciones si es el mismo usuario
-    if (authorId == currentUserId) return;
+    // Si es el mismo usuario, navegar a su propio perfil
+    if (authorId == currentUserId) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => const ProfileScreen(
+            isEditable: true,
+          ),
+        ),
+      );
+      return;
+    }
 
+    // Para otros usuarios, mostrar opciones
     showModalBottomSheet(
       context: context,
       builder: (context) => SafeArea(
@@ -759,19 +770,19 @@ class _FeedScreenState extends State<FeedScreen> with TickerProviderStateMixin {
               ),
             ),
             ListTile(
-              leading: const Icon(Icons.chat_bubble_outline, color: Color(0xFF4A7AA7)),
-              title: const Text('Enviar mensaje'),
-              onTap: () {
-                Navigator.pop(context);
-                _sendMessageToUser(authorId, user);
-              },
-            ),
-            ListTile(
               leading: const Icon(Icons.person, color: Color(0xFF4A7AA7)),
               title: const Text('Ver perfil'),
               onTap: () {
                 Navigator.pop(context);
                 _viewUserProfile(authorId);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.chat_bubble_outline, color: Color(0xFF4A7AA7)),
+              title: const Text('Enviar mensaje'),
+              onTap: () {
+                Navigator.pop(context);
+                _sendMessageToUser(authorId, user);
               },
             ),
             ListTile(
@@ -852,8 +863,15 @@ class _FeedScreenState extends State<FeedScreen> with TickerProviderStateMixin {
   }
 
   void _viewUserProfile(String userId) {
-    // Navegar al perfil del usuario
-    Navigator.of(context).pushNamed('/profile', arguments: userId);
+    // Navegar al perfil del usuario específico
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ProfileScreen(
+          userId: userId,
+          isEditable: false, // Solo lectura para perfiles ajenos
+        ),
+      ),
+    );
   }
 
   void _reportUser(String userId) {

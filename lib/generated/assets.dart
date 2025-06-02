@@ -2,6 +2,8 @@
 class Assets {
   Assets._();
 
+  static const String iconsAppIcon = 'assets/icons/app_icon.png';
+  static const String iconsAppIconForeground = 'assets/icons/app_icon_foreground.png';
   static const String imagesGoogleLogo = 'assets/images/google_logo.png';
 
 }

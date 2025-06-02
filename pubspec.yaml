@@ -84,6 +84,21 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.13.1  # Agregar esta línea
+
+# Configuración del ícono de la app
+flutter_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/icons/app_icon.png"
+  min_sdk_android: 21
+
+  # Para Android adaptive icons
+  adaptive_icon_background: "#4A7AA7"
+  adaptive_icon_foreground: "assets/icons/app_icon_foreground.png"
+
+  # Configuraciones específicas
+  remove_alpha_ios: true
 
 flutter:
   uses-material-design: true
