@@ -68,13 +68,34 @@ class _PetDiscoveryScreenState extends State<PetDiscoveryScreen>
   Future<void> _loadPotentialMatches() async {
     final matchProvider = Provider.of<MatchProvider>(context, listen: false);
 
-    await matchProvider.findPotentialMatches(
-      petId: widget.selectedPet.id,
-      type: widget.selectedPet.type,
-      size: widget.selectedPet.size,
-      forMating: widget.selectedPet.isForMating,
-      forPlaydate: true,
-    );
+    print('🔍 Iniciando búsqueda de matches para mascota:');
+    print('   Pet ID: ${widget.selectedPet.id}');
+    print('   Type: ${widget.selectedPet.type}');
+    print('   Size: ${widget.selectedPet.size}');
+    print('   For Mating: ${widget.selectedPet.isForMating}');
+
+    try {
+      await matchProvider.findPotentialMatches(
+        petId: widget.selectedPet.id,
+        type: widget.selectedPet.type,
+        size: widget.selectedPet.size,
+        forMating: widget.selectedPet.isForMating,
+        forPlaydate: true,
+      );
+
+      print('✅ Búsqueda completada');
+      print('   Matches encontrados: ${matchProvider.potentialMatches.length}');
+
+      if (matchProvider.potentialMatches.isEmpty) {
+        print('⚠️ No se encontraron matches. Verificar:');
+        print('   1. Que existan otras mascotas en Firestore');
+        print('   2. Que las reglas de Firestore permitan leer pets');
+        print('   3. Que los índices estén configurados');
+      }
+
+    } catch (e) {
+      print('❌ Error en búsqueda de matches: $e');
+    }
   }
 
   @override

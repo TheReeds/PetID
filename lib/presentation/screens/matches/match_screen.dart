@@ -2,6 +2,7 @@ import 'package:apppetid/presentation/screens/matches/user_discovery_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../../providers/chat_provider.dart';
 import '../../providers/match_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/pet_provider.dart';
@@ -743,13 +744,73 @@ class _MatchScreenState extends State<MatchScreen> with TickerProviderStateMixin
     Navigator.of(context).pushNamed('/add-pet');
   }
 
-  void _chatWithMatch(MatchModel match) {
-    // Implementar chat
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Chat próximamente')),
-    );
-  }
+  void _chatWithMatch(MatchModel match) async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
+    if (authProvider.currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error: Usuario no autenticado')),
+      );
+      return;
+    }
+
+    final currentUserId = authProvider.currentUser!.id;
+    final otherUserId = match.fromUserId == currentUserId
+        ? match.toUserId
+        : match.fromUserId;
+
+    try {
+      // Mostrar loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(color: Color(0xFF4A7AA7)),
+        ),
+      );
+
+      String? chatId;
+
+      if (match.isPetMatch) {
+        // Chat desde match de mascotas - usar método específico
+        chatId = await chatProvider.createChatFromMatch(
+          matchId: match.id,
+          fromUserId: currentUserId,
+          toUserId: otherUserId,
+          initialMessage: '¡Hola! Me gustaría coordinar nuestro ${_getMatchTypeText(match.type).toLowerCase()}.',
+        );
+      } else {
+        // Chat desde match de usuarios
+        chatId = await chatProvider.createDirectChat(
+          fromUserId: currentUserId,
+          toUserId: otherUserId,
+          initialMessage: '¡Hola! Nos hicimos match para ${_getMatchTypeText(match.type).toLowerCase()}.',
+        );
+      }
+
+      Navigator.pop(context); // Cerrar loading
+
+      if (chatId != null) {
+        // Navegar al chat
+        Navigator.of(context).pushNamed(
+          '/chat',
+          arguments: {
+            'chatId': chatId,
+            'currentUserId': currentUserId,
+          },
+        );
+      } else {
+        throw Exception('No se pudo crear el chat');
+      }
+
+    } catch (e) {
+      Navigator.pop(context); // Cerrar loading
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error creando chat: $e')),
+      );
+    }
+  }
   void _viewMatchDetails(MatchModel match) {
     // Implementar detalles del match
     ScaffoldMessenger.of(context).showSnackBar(
@@ -779,5 +840,25 @@ class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(_SliverTabBarDelegate oldDelegate) {
     return false;
+  }
+  String _getMatchTypeText(MatchType type) {
+    switch (type) {
+      case MatchType.mating:
+        return 'Reproducción';
+      case MatchType.playdate:
+        return 'Playdate';
+      case MatchType.adoption:
+        return 'Adopción';
+      case MatchType.friendship:
+        return 'Amistad';
+      case MatchType.petOwnerFriendship:
+        return 'Amistad';
+      case MatchType.petActivity:
+        return 'Actividades';
+      case MatchType.petCare:
+        return 'Cuidado';
+      case MatchType.socialMeet:
+        return 'Encuentro';
+    }
   }
 }

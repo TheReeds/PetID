@@ -245,9 +245,8 @@ class PostProvider extends ChangeNotifier {
   // Agregar comentario
   Future<bool> addComment(String postId, String comment, String userId) async {
     try {
-      await _postRepository.addComment(postId, comment, userId);
-
-      // Actualizar contador de comentarios localmente
+      // Este metodo ahora delega al CommentProvider
+      // pero aún actualiza el contador local para optimización
       final post = _findPostById(postId);
       if (post != null) {
         final updatedPost = post.copyWith(
@@ -261,6 +260,14 @@ class PostProvider extends ChangeNotifier {
     } catch (e) {
       _setError('Error agregando comentario: $e');
       return false;
+    }
+  }
+  void updateCommentsCount(String postId, int newCount) {
+    final post = _findPostById(postId);
+    if (post != null) {
+      final updatedPost = post.copyWith(commentsCount: newCount);
+      _updatePostInLists(updatedPost);
+      notifyListeners();
     }
   }
 

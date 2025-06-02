@@ -1,9 +1,11 @@
 import 'package:apppetid/presentation/providers/auth_provider.dart';
 import 'package:apppetid/presentation/providers/chat_provider.dart';
+import 'package:apppetid/presentation/providers/comment_provider.dart';
 import 'package:apppetid/presentation/providers/match_provider.dart';
 import 'package:apppetid/presentation/providers/pet_provider.dart';
 import 'package:apppetid/presentation/providers/post_provider.dart';
 import 'package:apppetid/presentation/providers/user_provider.dart';
+import 'package:apppetid/presentation/providers/lost_pet_provider.dart'; // NUEVO
 import 'package:apppetid/presentation/screens/auth/register_screen.dart';
 import 'package:apppetid/presentation/screens/auth/login_screen.dart';
 import 'package:apppetid/presentation/screens/chat/chat_list_screen.dart';
@@ -12,10 +14,12 @@ import 'package:apppetid/presentation/screens/home/add_first_pet_screen.dart';
 import 'package:apppetid/presentation/screens/home/home_screen.dart';
 import 'package:apppetid/presentation/screens/pets/add_pet_screen.dart';
 import 'package:apppetid/presentation/screens/pets/my_pets.dart';
+import 'package:apppetid/presentation/screens/pets/lost_pets_screen.dart'; // NUEVO
 import 'package:apppetid/presentation/screens/social/discover_screen.dart';
 import 'package:apppetid/presentation/screens/social/feed_screen.dart';
 import 'package:apppetid/presentation/screens/social/post_create_screen.dart';
 import 'package:apppetid/presentation/screens/social/profile_screen.dart';
+import 'package:apppetid/data/services/notification_service.dart'; // NUEVO
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
@@ -24,19 +28,26 @@ import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Inicializar Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Inicializar servicio de notificaciones
+  await NotificationService.initialize();
 
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => PetProvider()),
+        ChangeNotifierProvider(create: (_) => LostPetProvider()), // NUEVO
         ChangeNotifierProvider(create: (_) => PostProvider()),
         ChangeNotifierProvider(create: (_) => MatchProvider()),
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => ChatProvider()),
+        ChangeNotifierProvider(create: (_) => CommentProvider()),
       ],
       child: const MyApp(),
     ),
@@ -91,6 +102,11 @@ class MyApp extends StatelessWidget {
 
           // Si el usuario está autenticado
           if (authProvider.isAuthenticated && authProvider.currentUser != null) {
+            // Guardar token FCM cuando se autentica
+            WidgetsBinding.instance.addPostFrameCallback((_) async {
+              await NotificationService.saveDeviceToken(authProvider.currentUser!.id);
+            });
+
             // Cargar mascotas del usuario si no se han cargado
             if (petProvider.state == PetState.idle) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -141,6 +157,7 @@ class MyApp extends StatelessWidget {
         '/add-first-pet': (context) => const AddFirstPetScreen(),
         '/add-pet': (context) => const AddPetScreen(),
         '/my-pets': (context) => const MyPetsScreen(),
+        '/lost-pets': (context) => const LostPetsScreen(), // NUEVO
         '/feed': (context) => const FeedScreen(),
         '/discover': (context) => const DiscoverScreen(),
         '/create-post': (context) => const PostCreateScreen(),
