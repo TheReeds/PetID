@@ -1,53 +1,82 @@
 import 'package:apppetid/presentation/providers/auth_provider.dart';
 import 'package:apppetid/presentation/providers/chat_provider.dart';
 import 'package:apppetid/presentation/providers/comment_provider.dart';
+import 'package:apppetid/presentation/providers/event_provider.dart';
 import 'package:apppetid/presentation/providers/match_provider.dart';
 import 'package:apppetid/presentation/providers/pet_provider.dart';
 import 'package:apppetid/presentation/providers/post_provider.dart';
 import 'package:apppetid/presentation/providers/user_provider.dart';
-import 'package:apppetid/presentation/providers/lost_pet_provider.dart'; // NUEVO
+import 'package:apppetid/presentation/providers/lost_pet_provider.dart';
 import 'package:apppetid/presentation/screens/auth/register_screen.dart';
 import 'package:apppetid/presentation/screens/auth/login_screen.dart';
 import 'package:apppetid/presentation/screens/chat/chat_list_screen.dart';
 import 'package:apppetid/presentation/screens/chat/chat_screen.dart';
+import 'package:apppetid/presentation/screens/events/create_event_screen.dart';
+import 'package:apppetid/presentation/screens/events/event_detail_screen.dart';
+import 'package:apppetid/presentation/screens/events/events_screen.dart';
 import 'package:apppetid/presentation/screens/home/add_first_pet_screen.dart';
 import 'package:apppetid/presentation/screens/home/home_screen.dart';
 import 'package:apppetid/presentation/screens/pets/add_pet_screen.dart';
 import 'package:apppetid/presentation/screens/pets/my_pets.dart';
-import 'package:apppetid/presentation/screens/pets/lost_pets_screen.dart'; // NUEVO
+import 'package:apppetid/presentation/screens/pets/lost_pets_screen.dart';
 import 'package:apppetid/presentation/screens/social/discover_screen.dart';
 import 'package:apppetid/presentation/screens/social/feed_screen.dart';
 import 'package:apppetid/presentation/screens/social/post_create_screen.dart';
 import 'package:apppetid/presentation/screens/social/profile_screen.dart';
-import 'package:apppetid/data/services/notification_service.dart'; // NUEVO
+import 'package:apppetid/data/services/notification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:intl/intl.dart';
+import 'package:flutter/foundation.dart';
 
+import 'data/models/event_model.dart';
 import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Inicializar Firebase
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  try {
+    // Inicializar Firebase
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    if (kDebugMode) {
+      print('✅ Firebase inicializado');
+    }
 
-  // Inicializar servicio de notificaciones
-  await NotificationService.initialize();
+    // Inicializar localización de fechas
+    await initializeDateFormatting('es', null);
+    Intl.defaultLocale = 'es';
+    if (kDebugMode) {
+      print('✅ Localización configurada');
+    }
+
+    // NUEVO: Inicializar servicio de notificaciones
+    await NotificationService.initialize();
+    if (kDebugMode) {
+      print('✅ Servicio de notificaciones inicializado');
+    }
+
+  } catch (e) {
+    if (kDebugMode) {
+      print('❌ Error durante la inicialización: $e');
+    }
+  }
 
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => PetProvider()),
-        ChangeNotifierProvider(create: (_) => LostPetProvider()), // NUEVO
+        ChangeNotifierProvider(create: (_) => LostPetProvider()),
         ChangeNotifierProvider(create: (_) => PostProvider()),
         ChangeNotifierProvider(create: (_) => MatchProvider()),
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => ChatProvider()),
         ChangeNotifierProvider(create: (_) => CommentProvider()),
+        ChangeNotifierProvider(create: (_) => EventProvider()),
       ],
       child: const MyApp(),
     ),
@@ -94,6 +123,14 @@ class MyApp extends StatelessWidget {
                         color: Color(0xFF4A7AA7),
                       ),
                     ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Cargando...',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF4A7AA7),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -102,9 +139,19 @@ class MyApp extends StatelessWidget {
 
           // Si el usuario está autenticado
           if (authProvider.isAuthenticated && authProvider.currentUser != null) {
-            // Guardar token FCM cuando se autentica
+            // MODIFICADO: Configurar notificaciones de forma más robusta
             WidgetsBinding.instance.addPostFrameCallback((_) async {
-              await NotificationService.saveDeviceToken(authProvider.currentUser!.id);
+              try {
+                // Solo guardar token si no se ha hecho antes en esta sesión
+                await NotificationService.saveDeviceToken(authProvider.currentUser!.id);
+                if (kDebugMode) {
+                  print('🔔 Token FCM actualizado para: ${authProvider.currentUser!.displayName}');
+                }
+              } catch (e) {
+                if (kDebugMode) {
+                  print('❌ Error actualizando token FCM: $e');
+                }
+              }
             });
 
             // Cargar mascotas del usuario si no se han cargado
@@ -157,12 +204,18 @@ class MyApp extends StatelessWidget {
         '/add-first-pet': (context) => const AddFirstPetScreen(),
         '/add-pet': (context) => const AddPetScreen(),
         '/my-pets': (context) => const MyPetsScreen(),
-        '/lost-pets': (context) => const LostPetsScreen(), // NUEVO
+        '/lost-pets': (context) => const LostPetsScreen(),
         '/feed': (context) => const FeedScreen(),
         '/discover': (context) => const DiscoverScreen(),
         '/create-post': (context) => const PostCreateScreen(),
         '/profile': (context) => const ProfileScreen(),
         '/chat-list': (context) => const ChatListScreen(),
+        '/events': (context) => const EventsScreen(),
+        '/create-event': (context) => const CreateEventScreen(),
+        '/event-detail': (context) {
+          final event = ModalRoute.of(context)!.settings.arguments as EventModel;
+          return EventDetailScreen(event: event);
+        },
       },
       onGenerateRoute: (settings) {
         if (settings.name == '/chat') {
