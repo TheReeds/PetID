@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../data/models/user_model.dart';
 import '../../data/repositories/auth_repository.dart';
+import '../../data/services/notification_service.dart'; // AGREGADO
 
 enum AuthState { initial, loading, authenticated, unauthenticated, error }
 
@@ -33,6 +34,12 @@ class AuthProvider extends ChangeNotifier {
 
       if (user != null) {
         await _loadUserData(user.uid);
+
+        // NUEVO: Configurar notificaciones después del login automático
+        if (_currentUser != null) {
+          await _setupNotifications();
+        }
+
         _setState(AuthState.authenticated);
       } else {
         _currentUser = null;
@@ -71,6 +78,10 @@ class AuthProvider extends ChangeNotifier {
 
       if (credential?.user != null) {
         await _loadUserData(credential!.user!.uid);
+
+        // NUEVO: Configurar notificaciones después del registro
+        await _setupNotifications();
+
         _setState(AuthState.authenticated);
         return true;
       }
@@ -99,6 +110,10 @@ class AuthProvider extends ChangeNotifier {
 
       if (credential?.user != null) {
         await _loadUserData(credential!.user!.uid);
+
+        // NUEVO: Configurar notificaciones después del login
+        await _setupNotifications();
+
         _setState(AuthState.authenticated);
         return true;
       }
@@ -111,10 +126,41 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  // Login con Google
+  Future<bool> signInWithGoogle() async {
+    try {
+      _setState(AuthState.loading);
+      _clearError();
+
+      final credential = await _authRepository.signInWithGoogle();
+
+      if (credential?.user != null) {
+        await _loadUserData(credential!.user!.uid);
+
+        // NUEVO: Configurar notificaciones después del login con Google
+        await _setupNotifications();
+
+        _setState(AuthState.authenticated);
+        return true;
+      }
+
+      _setState(AuthState.unauthenticated);
+      return false;
+    } catch (e) {
+      _setError(e.toString());
+      _setState(AuthState.error);
+      return false;
+    }
+  }
+
   // Cerrar sesión
   Future<void> signOut() async {
     try {
       _setState(AuthState.loading);
+
+      // NUEVO: Desuscribirse de notificaciones antes del logout
+      await _teardownNotifications();
+
       await _authRepository.signOut();
       _currentUser = null;
       _firebaseUser = null;
@@ -214,6 +260,10 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> deleteAccount() async {
     try {
       _setState(AuthState.loading);
+
+      // NUEVO: Desuscribirse de notificaciones antes de eliminar cuenta
+      await _teardownNotifications();
+
       await _authRepository.deleteAccount();
       _currentUser = null;
       _firebaseUser = null;
@@ -225,27 +275,7 @@ class AuthProvider extends ChangeNotifier {
       return false;
     }
   }
-  Future<bool> signInWithGoogle() async {
-    try {
-      _setState(AuthState.loading);
-      _clearError();
 
-      final credential = await _authRepository.signInWithGoogle();
-
-      if (credential?.user != null) {
-        await _loadUserData(credential!.user!.uid);
-        _setState(AuthState.authenticated);
-        return true;
-      }
-
-      _setState(AuthState.unauthenticated);
-      return false;
-    } catch (e) {
-      _setError(e.toString());
-      _setState(AuthState.error);
-      return false;
-    }
-  }
   // Recargar datos del usuario
   Future<void> refreshUserData() async {
     if (_firebaseUser != null) {
@@ -263,6 +293,57 @@ class AuthProvider extends ChangeNotifier {
         }
       } catch (e) {
         print('Error refreshing user data: $e');
+      }
+    }
+  }
+
+  // NUEVO: Configurar notificaciones para usuario autenticado
+  Future<void> _setupNotifications() async {
+    if (_currentUser == null) return;
+
+    try {
+      if (kDebugMode) {
+        print('🔔 Configurando notificaciones para: ${_currentUser!.displayName}');
+      }
+
+      // Suscribirse a todos los tópicos de notificaciones
+      await NotificationService.subscribeToAllNotifications();
+      await NotificationService.subscribeToEventNotifications();
+
+      // Guardar token FCM en Firestore
+      await NotificationService.saveDeviceToken(_currentUser!.id);
+
+      if (kDebugMode) {
+        print('✅ Notificaciones configuradas correctamente');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error configurando notificaciones: $e');
+      }
+      // No lanzar excepción para no interrumpir el flujo de autenticación
+    }
+  }
+
+  // NUEVO: Desconfigurar notificaciones para logout
+  Future<void> _teardownNotifications() async {
+    try {
+      if (kDebugMode) {
+        print('🔕 Desonfigurando notificaciones...');
+      }
+
+      // Desuscribirse de todos los tópicos
+      await NotificationService.unsubscribeFromAllNotifications();
+      await NotificationService.unsubscribeFromEventNotifications();
+
+      // Limpiar notificaciones locales
+      await NotificationService.clearAllNotifications();
+
+      if (kDebugMode) {
+        print('✅ Notificaciones desconfiguradas');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error desonfigurando notificaciones: $e');
       }
     }
   }

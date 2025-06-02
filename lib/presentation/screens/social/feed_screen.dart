@@ -328,50 +328,107 @@ class _FeedScreenState extends State<FeedScreen> with TickerProviderStateMixin {
     return SliverToBoxAdapter(
       child: Container(
         margin: const EdgeInsets.all(16),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
+        child: Column(
           children: [
-            Expanded(
-              child: _buildQuickAction(
-                'Mascotas\nPerdidas',
-                Icons.search,
-                Colors.red,
-                    () => _viewLostPets(),
+            // Primera fila de acciones
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white,
+                    const Color(0xFF4A7AA7).withOpacity(0.02),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 20,
+                    offset: const Offset(0, 4),
+                  ),
+                  BoxShadow(
+                    color: Colors.white,
+                    blurRadius: 20,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildEnhancedQuickAction(
+                      'Mascotas Perdidas',
+                      Icons.search_rounded,
+                      const LinearGradient(colors: [Color(0xFFE74C3C), Color(0xFFC0392B)]),
+                          () => _viewLostPets(),
+                      'Ayuda a encontrar mascotas',
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildEnhancedQuickAction(
+                      'Adopción',
+                      Icons.favorite_rounded,
+                      const LinearGradient(colors: [Color(0xFFE67E22), Color(0xFFD35400)]),
+                          () => _viewAdoption(),
+                      'Encuentra tu compañero',
+                    ),
+                  ),
+                ],
               ),
             ),
-            Expanded(
-              child: _buildQuickAction(
-                'Adopción',
-                Icons.favorite,
-                Colors.orange,
-                    () => _viewAdoption(),
+            const SizedBox(height: 12),
+            // Segunda fila de acciones
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white,
+                    const Color(0xFF4A7AA7).withOpacity(0.02),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 20,
+                    offset: const Offset(0, 4),
+                  ),
+                  BoxShadow(
+                    color: Colors.white,
+                    blurRadius: 20,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
               ),
-            ),
-            Expanded(
-              child: _buildQuickAction(
-                'Veterinarios',
-                Icons.medical_services,
-                Colors.green,
-                    () => _findVets(),
-              ),
-            ),
-            Expanded(
-              child: _buildQuickAction(
-                'Eventos',
-                Icons.event,
-                Colors.blue,
-                    () => _viewEvents(),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildEnhancedQuickAction(
+                      'Veterinarios',
+                      Icons.medical_services_rounded,
+                      const LinearGradient(colors: [Color(0xFF27AE60), Color(0xFF2ECC71)]),
+                          () => _findVets(),
+                      'Cuidado profesional',
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildEnhancedQuickAction(
+                      'Eventos',
+                      Icons.event_rounded,
+                      const LinearGradient(colors: [Color(0xFF3498DB), Color(0xFF2980B9)]),
+                          () => _viewEvents(),
+                      'Actividades y encuentros',
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -379,34 +436,77 @@ class _FeedScreenState extends State<FeedScreen> with TickerProviderStateMixin {
       ),
     );
   }
-
-  Widget _buildQuickAction(String title, IconData icon, Color color, VoidCallback onTap) {
+  Widget _buildEnhancedQuickAction(
+      String title,
+      IconData icon,
+      Gradient gradient,
+      VoidCallback onTap,
+      String subtitle,
+      ) {
     return GestureDetector(
       onTap: () {
-        HapticFeedback.lightImpact();
+        HapticFeedback.mediumImpact();
         onTap();
       },
-      child: Column(
-        children: [
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              shape: BoxShape.circle,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: gradient,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: gradient.colors.first.withOpacity(0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
             ),
-            child: Icon(icon, color: color, size: 24),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: Icon(
+                icon,
+                color: Colors.white,
+                size: 28,
+              ),
             ),
-            textAlign: TextAlign.center,
-          ),
-        ],
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+                height: 1.2,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+                color: Colors.white.withOpacity(0.9),
+                height: 1.1,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1181,9 +1281,8 @@ class _FeedScreenState extends State<FeedScreen> with TickerProviderStateMixin {
   }
 
   void _viewEvents() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Eventos próximamente')),
-    );
+    HapticFeedback.lightImpact();
+    Navigator.of(context).pushNamed('/events');
   }
 
   void _toggleLike(PostModel post) {

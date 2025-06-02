@@ -156,4 +156,59 @@ class StorageService {
       throw Exception('Error obteniendo URL de descarga: $e');
     }
   }
+  static Future<String> uploadEventPhoto({
+    required String eventId,
+    required File imageFile,
+  }) async {
+    try {
+      final fileName = '${_uuid.v4()}.jpg';
+      final ref = _storage.ref().child('events/$eventId/photos/$fileName');
+
+      final uploadTask = ref.putFile(imageFile);
+      final snapshot = await uploadTask;
+
+      return await snapshot.ref.getDownloadURL();
+    } catch (e) {
+      throw Exception('Error subiendo foto del evento: $e');
+    }
+  }
+
+// Subir múltiples fotos de evento
+  static Future<List<String>> uploadEventPhotos({
+    required String eventId,
+    required List<File> imageFiles,
+  }) async {
+    try {
+      List<String> downloadUrls = [];
+
+      for (int i = 0; i < imageFiles.length; i++) {
+        final fileName = '${_uuid.v4()}_$i.jpg';
+        final ref = _storage.ref().child('events/$eventId/photos/$fileName');
+
+        final uploadTask = ref.putFile(imageFiles[i]);
+        final snapshot = await uploadTask;
+        final downloadUrl = await snapshot.ref.getDownloadURL();
+
+        downloadUrls.add(downloadUrl);
+      }
+
+      return downloadUrls;
+    } catch (e) {
+      throw Exception('Error subiendo fotos del evento: $e');
+    }
+  }
+
+// Eliminar fotos de evento
+  static Future<void> deleteEventPhotos(String eventId) async {
+    try {
+      final ref = _storage.ref().child('events/$eventId');
+      final listResult = await ref.listAll();
+
+      for (Reference item in listResult.items) {
+        await item.delete();
+      }
+    } catch (e) {
+      throw Exception('Error eliminando fotos del evento: $e');
+    }
+  }
 }

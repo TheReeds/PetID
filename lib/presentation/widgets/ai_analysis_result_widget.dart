@@ -104,8 +104,10 @@ class _AIAnalysisResultWidgetState extends State<AIAnalysisResultWidget>
     final breedAnalysis = widget.result.breedAnalysis;
     final bestResult = breedAnalysis.bestResult;
 
-    return Container(
-      padding: const EdgeInsets.all(20),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeOutCubic,
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -113,27 +115,40 @@ class _AIAnalysisResultWidgetState extends State<AIAnalysisResultWidget>
           colors: [
             const Color(0xFF4A7AA7),
             const Color(0xFF6B9BD1),
+            const Color(0xFF8BB5E8),
           ],
+          stops: const [0.0, 0.6, 1.0],
         ),
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF4A7AA7).withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         children: [
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.2),
                   shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.3),
+                    width: 2,
+                  ),
                 ),
                 child: const Icon(
                   Icons.psychology,
                   color: Colors.white,
-                  size: 30,
+                  size: 28,
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 18),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -142,16 +157,18 @@ class _AIAnalysisResultWidgetState extends State<AIAnalysisResultWidget>
                       'Análisis Completado',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 18,
+                        fontSize: 20,
                         fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Text(
                       '${breedAnalysis.modelCount} modelo${breedAnalysis.modelCount != 1 ? 's' : ''} de IA analizaron la imagen',
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
                         fontSize: 14,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
@@ -161,54 +178,78 @@ class _AIAnalysisResultWidgetState extends State<AIAnalysisResultWidget>
           ),
 
           if (widget.result.hasBreedInfo) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(10),
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.2),
+                  width: 1,
+                ),
               ),
               child: Column(
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Raza Identificada',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Raza Identificada',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.8),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.5,
+                              ),
                             ),
-                          ),
-                          Text(
-                            bestResult.breed,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                            const SizedBox(height: 4),
+                            Text(
+                              bestResult.breed,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.3,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 16),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          const Text(
+                          Text(
                             'Confianza',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: Colors.white.withOpacity(0.8),
                               fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.5,
                             ),
                           ),
-                          Text(
-                            bestResult.confidencePercentage,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              bestResult.confidencePercentage,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ],
@@ -216,34 +257,64 @@ class _AIAnalysisResultWidgetState extends State<AIAnalysisResultWidget>
                     ],
                   ),
 
-                  // Indicador de consenso
+                  // Indicador de consenso mejorado
                   if (breedAnalysis.modelCount > 1) ...[
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Icon(
-                          breedAnalysis.hasConsensus ? Icons.check_circle : Icons.info,
-                          color: Colors.white,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Consenso: ${breedAnalysis.consensusLevel}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: breedAnalysis.hasConsensus
+                                  ? Colors.green.withOpacity(0.2)
+                                  : Colors.orange.withOpacity(0.2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              breedAnalysis.hasConsensus
+                                  ? Icons.check_circle
+                                  : Icons.info,
+                              color: Colors.white,
+                              size: 16,
+                            ),
                           ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          'Tiempo: ${widget.result.totalProcessingTime.inSeconds}s',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Consenso: ${breedAnalysis.consensusLevel}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '${widget.result.totalProcessingTime.inSeconds}s',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ],
@@ -260,20 +331,66 @@ class _AIAnalysisResultWidgetState extends State<AIAnalysisResultWidget>
       margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
         color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(25),
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: TabBar(
         controller: _tabController,
         labelColor: Colors.white,
         unselectedLabelColor: Colors.grey[600],
+        labelStyle: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.5,
+        ),
+        unselectedLabelStyle: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+        ),
         indicator: BoxDecoration(
           color: const Color(0xFF4A7AA7),
-          borderRadius: BorderRadius.circular(25),
+          borderRadius: BorderRadius.circular(26),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF4A7AA7).withOpacity(0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        indicatorSize: TabBarIndicatorSize.tab,
+        indicatorPadding: const EdgeInsets.all(4),
+        dividerColor: Colors.transparent,
+        overlayColor: MaterialStateProperty.resolveWith<Color?>(
+              (Set<MaterialState> states) {
+            if (states.contains(MaterialState.hovered)) {
+              return Colors.grey.withOpacity(0.1);
+            }
+            if (states.contains(MaterialState.pressed)) {
+              return Colors.grey.withOpacity(0.2);
+            }
+            return null;
+          },
         ),
         tabs: const [
-          Tab(text: 'Raza'),
-          Tab(text: 'Info'),
-          Tab(text: 'Similares'),
+          Tab(
+            text: 'Raza',
+            height: 45,
+          ),
+          Tab(
+            text: 'Información',
+            height: 45,
+          ),
+          Tab(
+            text: 'Similares',
+            height: 45,
+          ),
         ],
       ),
     );
@@ -1000,31 +1117,58 @@ class _AIAnalysisResultWidgetState extends State<AIAnalysisResultWidget>
   Widget _buildInfoCard({
     required String title,
     required List<Widget> children,
+    IconData? icon,
+    Color? color,
   }) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+          Row(
+            children: [
+              if (icon != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: (color ?? const Color(0xFF4A7AA7)).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: color ?? const Color(0xFF4A7AA7),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           ...children,
         ],
       ),
@@ -1032,12 +1176,39 @@ class _AIAnalysisResultWidgetState extends State<AIAnalysisResultWidget>
   }
 
   Widget _buildInfoRow(String label, String value, IconData icon) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.grey[200]!,
+          width: 1,
+        ),
+      ),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: Colors.grey[600]),
-          const SizedBox(width: 12),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Icon(
+              icon,
+              size: 18,
+              color: const Color(0xFF4A7AA7),
+            ),
+          ),
+          const SizedBox(width: 16),
           Expanded(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1047,13 +1218,15 @@ class _AIAnalysisResultWidgetState extends State<AIAnalysisResultWidget>
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.grey[700],
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
                 Text(
                   value,
                   style: const TextStyle(
                     fontSize: 14,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black87,
                   ),
                 ),
               ],
@@ -1188,39 +1361,72 @@ class _AIAnalysisResultWidgetState extends State<AIAnalysisResultWidget>
 
   Widget _buildActionButtons() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(
+            color: Colors.grey[200]!,
+            width: 1,
+          ),
+        ),
+      ),
       child: Row(
         children: [
           if (widget.onNewAnalysis != null)
             Expanded(
-              child: OutlinedButton.icon(
-                onPressed: widget.onNewAnalysis,
-                icon: const Icon(Icons.camera_alt),
-                label: const Text('Nuevo Análisis'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              child: Container(
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: widget.onNewAnalysis,
+                  icon: const Icon(Icons.camera_alt, size: 20),
+                  label: const Text(
+                    'Nuevo Análisis',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF4A7AA7),
+                    side: const BorderSide(
+                      color: Color(0xFF4A7AA7),
+                      width: 1.5,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
                   ),
                 ),
               ),
             ),
 
           if (widget.onNewAnalysis != null && widget.onSaveResult != null)
-            const SizedBox(width: 16),
+            const SizedBox(width: 12),
 
           if (widget.onSaveResult != null)
             Expanded(
-              child: ElevatedButton.icon(
-                onPressed: widget.onSaveResult,
-                icon: const Icon(Icons.save),
-                label: const Text('Guardar Resultado'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4A7AA7),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              child: Container(
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: widget.onSaveResult,
+                  icon: const Icon(Icons.save, size: 20),
+                  label: const Text(
+                    'Guardar Resultado',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4A7AA7),
+                    foregroundColor: Colors.white,
+                    elevation: 2,
+                    shadowColor: const Color(0xFF4A7AA7).withOpacity(0.3),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
               ),
