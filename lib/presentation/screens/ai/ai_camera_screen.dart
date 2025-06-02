@@ -97,20 +97,40 @@ class _AICameraScreenState extends State<AICameraScreen> with TickerProviderStat
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('Reconocimiento IA'),
-        backgroundColor: Colors.transparent,
+        title: const Text(
+          'Reconocimiento IA',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
+          ),
+        ),
+        backgroundColor: Colors.black.withOpacity(0.3),
         foregroundColor: Colors.white,
         elevation: 0,
+        centerTitle: true,
         actions: [
           if (_showResults)
-            IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: _resetCamera,
+            Container(
+              margin: const EdgeInsets.only(right: 8),
+              child: IconButton(
+                icon: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.5),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.close, size: 20),
+                ),
+                onPressed: _resetCamera,
+              ),
             ),
         ],
       ),
-      body: _buildBody(),
+      body: SafeArea(
+        child: _buildBody(),
+      ),
     );
   }
 
@@ -127,87 +147,148 @@ class _AICameraScreenState extends State<AICameraScreen> with TickerProviderStat
   }
 
   Widget _buildLoadingScreen() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircularProgressIndicator(color: Colors.white),
-          SizedBox(height: 20),
-          Text(
-            'Inicializando cámara...',
-            style: TextStyle(color: Colors.white, fontSize: 16),
-          ),
-        ],
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.black,
+            Colors.grey.shade900,
+          ],
+        ),
+      ),
+      child: const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 60,
+              height: 60,
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                strokeWidth: 4,
+              ),
+            ),
+            SizedBox(height: 24),
+            Text(
+              'Inicializando cámara...',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Preparando el reconocimiento IA',
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildCameraScreen() {
-    return Stack(
-      children: [
-        // Vista de la cámara
-        Positioned.fill(
-          child: CameraPreview(_cameraController!),
-        ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Stack(
+          children: [
+            // Vista de la cámara con aspectRatio correcto
+            Positioned.fill(
+              child: ClipRect(
+                child: OverflowBox(
+                  alignment: Alignment.center,
+                  child: FittedBox(
+                    fit: BoxFit.cover,
+                    child: SizedBox(
+                      width: constraints.maxWidth,
+                      height: constraints.maxWidth / _cameraController!.value.aspectRatio,
+                      child: CameraPreview(_cameraController!),
+                    ),
+                  ),
+                ),
+              ),
+            ),
 
-        // Overlay de guía
-        Positioned.fill(
-          child: _buildCameraOverlay(),
-        ),
+            // Overlay de guía
+            Positioned.fill(
+              child: _buildCameraOverlay(constraints),
+            ),
 
-        // Animación de escaneo cuando está analizando
-        if (_isAnalyzing) _buildScanningOverlay(),
+            // Animación de escaneo cuando está analizando
+            if (_isAnalyzing) _buildScanningOverlay(constraints),
 
-        // Controles inferiores
-        Positioned(
-          bottom: 0,
-          left: 0,
-          right: 0,
-          child: _buildCameraControls(),
-        ),
+            // Instrucciones superiores
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: _buildInstructions(),
+            ),
 
-        // Instrucciones superiores
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          child: _buildInstructions(),
-        ),
-      ],
+            // Controles inferiores
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: _buildCameraControls(),
+            ),
+          ],
+        );
+      },
     );
   }
 
-  Widget _buildCameraOverlay() {
+  Widget _buildCameraOverlay(BoxConstraints constraints) {
+    final screenWidth = constraints.maxWidth;
+    final screenHeight = constraints.maxHeight;
+    final frameSize = screenWidth * 0.75; // 75% del ancho de pantalla
+    final maxFrameSize = 320.0;
+    final finalFrameSize = frameSize > maxFrameSize ? maxFrameSize : frameSize;
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.3),
+        color: Colors.black.withOpacity(0.4),
       ),
       child: Center(
         child: Container(
-          width: 300,
-          height: 300,
+          width: finalFrameSize,
+          height: finalFrameSize,
           decoration: BoxDecoration(
-            border: Border.all(color: Colors.white, width: 2),
+            border: Border.all(color: Colors.white.withOpacity(0.8), width: 2),
             borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.blue.withOpacity(0.3),
+                blurRadius: 20,
+                spreadRadius: 2,
+              ),
+            ],
           ),
           child: Stack(
             children: [
-              // Esquinas del marco
+              // Esquinas del marco mejoradas
               ...List.generate(4, (index) => _buildCorner(index)),
 
               // Centro del marco
               Center(
                 child: Container(
-                  width: 60,
-                  height: 60,
+                  width: 70,
+                  height: 70,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white.withOpacity(0.5), width: 2),
+                    color: Colors.blue.withOpacity(0.1),
+                    border: Border.all(color: Colors.white.withOpacity(0.6), width: 2),
                   ),
                   child: const Icon(
                     Icons.pets,
                     color: Colors.white,
-                    size: 30,
+                    size: 35,
                   ),
                 ),
               ),
@@ -219,6 +300,9 @@ class _AICameraScreenState extends State<AICameraScreen> with TickerProviderStat
   }
 
   Widget _buildCorner(int index) {
+    const cornerSize = 25.0;
+    const borderWidth = 4.0;
+
     final positions = [
       const Alignment(-1, -1), // Top-left
       const Alignment(1, -1),  // Top-right
@@ -229,64 +313,73 @@ class _AICameraScreenState extends State<AICameraScreen> with TickerProviderStat
     return Align(
       alignment: positions[index],
       child: Container(
-        width: 30,
-        height: 30,
+        margin: const EdgeInsets.all(8),
+        width: cornerSize,
+        height: cornerSize,
         decoration: BoxDecoration(
           border: Border(
-            top: index < 2 ? const BorderSide(color: Colors.white, width: 4) : BorderSide.none,
-            bottom: index >= 2 ? const BorderSide(color: Colors.white, width: 4) : BorderSide.none,
-            left: index % 2 == 0 ? const BorderSide(color: Colors.white, width: 4) : BorderSide.none,
-            right: index % 2 == 1 ? const BorderSide(color: Colors.white, width: 4) : BorderSide.none,
+            top: index < 2 ? const BorderSide(color: Colors.blue, width: borderWidth) : BorderSide.none,
+            bottom: index >= 2 ? const BorderSide(color: Colors.blue, width: borderWidth) : BorderSide.none,
+            left: index % 2 == 0 ? const BorderSide(color: Colors.blue, width: borderWidth) : BorderSide.none,
+            right: index % 2 == 1 ? const BorderSide(color: Colors.blue, width: borderWidth) : BorderSide.none,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildScanningOverlay() {
+  Widget _buildScanningOverlay(BoxConstraints constraints) {
+    final screenWidth = constraints.maxWidth;
+    final frameSize = screenWidth * 0.75;
+    final maxFrameSize = 320.0;
+    final finalFrameSize = frameSize > maxFrameSize ? maxFrameSize : frameSize;
+
     return AnimatedBuilder(
       animation: _scanAnimation,
       builder: (context, child) {
         return Container(
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.7),
+            color: Colors.black.withOpacity(0.8),
           ),
           child: Center(
             child: Container(
-              width: 300,
-              height: 300,
+              width: finalFrameSize,
+              height: finalFrameSize,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Stack(
                 children: [
-                  // Línea de escaneo
+                  // Línea de escaneo mejorada
                   Positioned(
-                    top: _scanAnimation.value * 260 + 20,
-                    left: 20,
-                    right: 20,
+                    top: _scanAnimation.value * (finalFrameSize - 60) + 30,
+                    left: 30,
+                    right: 30,
                     child: Container(
-                      height: 3,
+                      height: 4,
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
                             Colors.transparent,
-                            Colors.blue.withOpacity(0.8),
+                            Colors.blue,
+                            Colors.lightBlueAccent,
+                            Colors.blue,
                             Colors.transparent,
                           ],
                         ),
+                        borderRadius: BorderRadius.circular(2),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.blue.withOpacity(0.5),
-                            blurRadius: 10,
-                            spreadRadius: 2,
+                            color: Colors.blue.withOpacity(0.7),
+                            blurRadius: 15,
+                            spreadRadius: 3,
                           ),
                         ],
                       ),
                     ),
                   ),
 
-                  // Centro pulsante
+                  // Centro pulsante mejorado
                   Center(
                     child: AnimatedBuilder(
                       animation: _pulseAnimation,
@@ -294,17 +387,29 @@ class _AICameraScreenState extends State<AICameraScreen> with TickerProviderStat
                         return Transform.scale(
                           scale: _pulseAnimation.value,
                           child: Container(
-                            width: 80,
-                            height: 80,
+                            width: 90,
+                            height: 90,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: Colors.blue.withOpacity(0.3),
+                              gradient: RadialGradient(
+                                colors: [
+                                  Colors.blue.withOpacity(0.4),
+                                  Colors.blue.withOpacity(0.1),
+                                ],
+                              ),
                               border: Border.all(color: Colors.blue, width: 3),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.blue.withOpacity(0.5),
+                                  blurRadius: 20,
+                                  spreadRadius: 5,
+                                ),
+                              ],
                             ),
                             child: const Icon(
                               Icons.pets,
                               color: Colors.blue,
-                              size: 40,
+                              size: 45,
                             ),
                           ),
                         );
@@ -322,15 +427,21 @@ class _AICameraScreenState extends State<AICameraScreen> with TickerProviderStat
 
   Widget _buildInstructions() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 80, 20, 20),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.7),
-              borderRadius: BorderRadius.circular(25),
+              gradient: LinearGradient(
+                colors: [
+                  Colors.black.withOpacity(0.8),
+                  Colors.black.withOpacity(0.6),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(color: Colors.white.withOpacity(0.2)),
             ),
             child: Text(
               _isAnalyzing
@@ -339,26 +450,53 @@ class _AICameraScreenState extends State<AICameraScreen> with TickerProviderStat
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 16,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
               ),
               textAlign: TextAlign.center,
             ),
           ),
           if (!_isAnalyzing) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.8),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Text(
-                '• Reconocimiento de raza\n• Búsqueda de mascotas similares\n• Análisis de características',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.blue.withOpacity(0.8),
+                    Colors.blue.withOpacity(0.6),
+                  ],
                 ),
-                textAlign: TextAlign.center,
+                borderRadius: BorderRadius.circular(25),
+                border: Border.all(color: Colors.blue.withOpacity(0.3)),
+              ),
+              child: Column(
+                children: [
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.auto_awesome, color: Colors.white, size: 16),
+                      SizedBox(width: 8),
+                      Text(
+                        'Análisis IA Avanzado',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    '• Reconocimiento de raza\n• Búsqueda de mascotas similares\n• Análisis de características',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      height: 1.4,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
             ),
           ],
@@ -369,84 +507,167 @@ class _AICameraScreenState extends State<AICameraScreen> with TickerProviderStat
 
   Widget _buildCameraControls() {
     return Container(
-      padding: const EdgeInsets.all(30),
+      padding: const EdgeInsets.fromLTRB(30, 20, 30, 40),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.transparent,
+            Colors.black.withOpacity(0.8),
+          ],
+        ),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // Galería
-          FloatingActionButton(
-            heroTag: "gallery",
+          _buildControlButton(
+            icon: Icons.photo_library,
             onPressed: _isAnalyzing ? null : _pickFromGallery,
-            backgroundColor: Colors.white.withOpacity(0.2),
-            child: const Icon(Icons.photo_library, color: Colors.white),
+            size: 56,
           ),
 
           // Botón de captura principal
           GestureDetector(
             onTap: _isAnalyzing ? null : _captureAndAnalyze,
             child: Container(
-              width: 80,
-              height: 80,
+              width: 85,
+              height: 85,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: _isAnalyzing ? Colors.grey : Colors.white,
+                gradient: _isAnalyzing
+                    ? LinearGradient(colors: [Colors.grey.shade600, Colors.grey.shade700])
+                    : const LinearGradient(
+                  colors: [Colors.white, Colors.grey],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 border: Border.all(
-                  color: _isAnalyzing ? Colors.grey : Colors.blue,
+                  color: _isAnalyzing ? Colors.grey.shade600 : Colors.blue,
                   width: 4,
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: (_isAnalyzing ? Colors.grey : Colors.blue).withOpacity(0.3),
+                    blurRadius: 15,
+                    spreadRadius: 2,
+                  ),
+                ],
               ),
               child: _isAnalyzing
-                  ? const CircularProgressIndicator(
-                color: Colors.blue,
-                strokeWidth: 3,
+                  ? const Padding(
+                padding: EdgeInsets.all(20),
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                  strokeWidth: 4,
+                ),
               )
                   : const Icon(
                 Icons.camera_alt,
                 color: Colors.blue,
-                size: 35,
+                size: 40,
               ),
             ),
           ),
 
           // Cambiar cámara
-          FloatingActionButton(
-            heroTag: "switch_camera",
-            onPressed: _isAnalyzing ? null : _switchCamera,
-            backgroundColor: Colors.white.withOpacity(0.2),
-            child: const Icon(Icons.switch_camera, color: Colors.white),
+          _buildControlButton(
+            icon: Icons.switch_camera,
+            onPressed: _isAnalyzing || _cameras.length <= 1 ? null : _switchCamera,
+            size: 56,
           ),
         ],
       ),
     );
   }
 
+  Widget _buildControlButton({
+    required IconData icon,
+    required VoidCallback? onPressed,
+    required double size,
+  }) {
+    final isEnabled = onPressed != null;
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          colors: isEnabled
+              ? [Colors.white.withOpacity(0.3), Colors.white.withOpacity(0.1)]
+              : [Colors.grey.withOpacity(0.2), Colors.grey.withOpacity(0.1)],
+        ),
+        border: Border.all(
+          color: isEnabled ? Colors.white.withOpacity(0.5) : Colors.grey.withOpacity(0.3),
+          width: 2,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(size / 2),
+          onTap: onPressed,
+          child: Icon(
+            icon,
+            color: isEnabled ? Colors.white : Colors.white.withOpacity(0.5),
+            size: size * 0.4,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildResultsScreen() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.grey.shade900,
+            Colors.black,
+          ],
+        ),
+      ),
       child: Column(
         children: [
-          // Imagen capturada
+          // Imagen capturada con diseño mejorado
           if (_capturedImage != null)
             Container(
-              height: 200,
+              margin: const EdgeInsets.all(20),
+              height: 220,
               width: double.infinity,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(15),
-                image: DecorationImage(
-                  image: FileImage(_capturedImage!),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.5),
+                    blurRadius: 20,
+                    spreadRadius: 5,
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Image.file(
+                  _capturedImage!,
                   fit: BoxFit.cover,
                 ),
               ),
             ),
 
-          const SizedBox(height: 20),
-
           // Resultados del análisis
           Expanded(
-            child: AIAnalysisResultWidget(
-              result: _analysisResult!,
-              onSaveResult: _saveAnalysisResult,
-              onNewAnalysis: _resetCamera,
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20),
+              child: AIAnalysisResultWidget(
+                result: _analysisResult!,
+                onSaveResult: _saveAnalysisResult,
+                onNewAnalysis: _resetCamera,
+              ),
             ),
           ),
         ],
@@ -499,7 +720,12 @@ class _AICameraScreenState extends State<AICameraScreen> with TickerProviderStat
   Future<void> _pickFromGallery() async {
     // Implementar selección desde galería
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Función de galería próximamente')),
+      SnackBar(
+        content: const Text('Función de galería próximamente'),
+        backgroundColor: Colors.blue,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
     );
   }
 
@@ -535,9 +761,17 @@ class _AICameraScreenState extends State<AICameraScreen> with TickerProviderStat
 
     // Implementar guardado en historial
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Resultado guardado en el historial'),
+      SnackBar(
+        content: const Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.white),
+            SizedBox(width: 12),
+            Text('Resultado guardado en el historial'),
+          ],
+        ),
         backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
@@ -546,9 +780,16 @@ class _AICameraScreenState extends State<AICameraScreen> with TickerProviderStat
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Permiso de Cámara'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.camera_alt, color: Colors.blue),
+            SizedBox(width: 12),
+            Text('Permiso de Cámara'),
+          ],
+        ),
         content: const Text(
-          'Esta aplicación necesita acceso a la cámara para reconocer mascotas.',
+          'Esta aplicación necesita acceso a la cámara para reconocer mascotas mediante inteligencia artificial.',
         ),
         actions: [
           TextButton(
@@ -556,11 +797,15 @@ class _AICameraScreenState extends State<AICameraScreen> with TickerProviderStat
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
             onPressed: () {
               Navigator.of(context).pop();
               openAppSettings();
             },
-            child: const Text('Configuración'),
+            child: const Text('Configuración', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -571,12 +816,23 @@ class _AICameraScreenState extends State<AICameraScreen> with TickerProviderStat
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Error'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.error_outline, color: Colors.red),
+            SizedBox(width: 12),
+            Text('Error'),
+          ],
+        ),
         content: Text(message),
         actions: [
-          TextButton(
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
+            child: const Text('OK', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),

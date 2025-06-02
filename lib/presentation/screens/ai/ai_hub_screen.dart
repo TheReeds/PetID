@@ -186,7 +186,7 @@ class _AIHubScreenState extends State<AIHubScreen> with TickerProviderStateMixin
             Expanded(
               child: _buildFeatureCard(
                 title: 'Buscar\nSimilares',
-                subtitle: 'Encuentra mascotas parecidas',
+                subtitle: 'Encuentra mascotas',
                 icon: Icons.search,
                 color: Colors.green,
                 onTap: () => _openCameraScreen(AnalysisMode.similar),
@@ -329,7 +329,7 @@ class _AIHubScreenState extends State<AIHubScreen> with TickerProviderStateMixin
         onTap();
       },
       child: Container(
-        height: isWide ? 120 : 160,
+        constraints: const BoxConstraints(minHeight: 120),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -367,6 +367,8 @@ class _AIHubScreenState extends State<AIHubScreen> with TickerProviderStateMixin
                       fontWeight: FontWeight.bold,
                       color: color,
                     ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -375,6 +377,8 @@ class _AIHubScreenState extends State<AIHubScreen> with TickerProviderStateMixin
                       fontSize: 12,
                       color: Colors.grey[600],
                     ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
                   ),
                 ],
               ),
@@ -387,7 +391,7 @@ class _AIHubScreenState extends State<AIHubScreen> with TickerProviderStateMixin
           ],
         )
             : Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               padding: const EdgeInsets.all(16),
@@ -406,6 +410,8 @@ class _AIHubScreenState extends State<AIHubScreen> with TickerProviderStateMixin
                 color: color,
               ),
               textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
             ),
             const SizedBox(height: 8),
             Text(
@@ -415,12 +421,15 @@ class _AIHubScreenState extends State<AIHubScreen> with TickerProviderStateMixin
                 color: Colors.grey[600],
               ),
               textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
             ),
           ],
         ),
       ),
     );
   }
+
 
   Widget _buildToolCard({
     required String title,

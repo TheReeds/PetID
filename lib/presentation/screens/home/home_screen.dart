@@ -148,39 +148,46 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // NUEVO: AppBar con botón de IA
   PreferredSizeWidget? _buildAppBar() {
-    // Solo mostrar AppBar en ciertas pestañas
-    if (_currentIndex == 0 || _currentIndex == 4) { // Feed y Mascotas
+    if (_currentIndex == 0 || _currentIndex == 4) {
       return AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        automaticallyImplyLeading: false,
+        titleSpacing: 20,
         title: Text(
           _getAppBarTitle(),
           style: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
             color: Color(0xFF2C3E50),
-            fontWeight: FontWeight.bold,
           ),
         ),
         actions: [
-          // Botón de IA
-          Container(
-            margin: const EdgeInsets.only(right: 8),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  const Color(0xFF4A7AA7),
-                  const Color(0xFF6B9BD1),
+          Tooltip(
+            message: 'Reconocimiento con IA',
+            child: Container(
+              margin: const EdgeInsets.only(right: 16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF4A7AA7), Color(0xFF6B9BD1)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Color(0xFF4A7AA7).withOpacity(0.4),
+                    blurRadius: 8,
+                    offset: const Offset(2, 4),
+                  ),
                 ],
+                borderRadius: BorderRadius.circular(30),
               ),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: IconButton(
-              onPressed: _openAIHub,
-              icon: const Icon(
-                Icons.psychology,
-                color: Colors.white,
-                size: 24,
+              child: IconButton(
+                onPressed: _openAIHub,
+                icon: const Icon(Icons.psychology, color: Colors.white),
+                iconSize: 26,
+                splashRadius: 24,
               ),
-              tooltip: 'Reconocimiento IA',
             ),
           ),
         ],
@@ -188,6 +195,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
     return null;
   }
+
 
   String _getAppBarTitle() {
     switch (_currentIndex) {
